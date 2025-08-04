@@ -90,9 +90,9 @@ $ ndcli create rr hr.dept.old.example.com. a 1.2.3.8 -q
 
 # Cleanup
 $ ndcli delete zone old.example.com --cleanup
-INFO - Deleting RR hr.dept.old.example.com A 1.2.3.8 from zone old.example.com
-INFO - Freeing IP 1.2.3.8 from layer3domain default
 INFO - Deleting RR conflict A 1.2.3.4 from zone old.example.com
 INFO - Freeing IP 1.2.3.4 from layer3domain default
+INFO - Deleting RR hr.dept A 1.2.3.8 from zone old.example.com
+INFO - Freeing IP 1.2.3.8 from layer3domain default
 INFO - Deleting RR test DNAME test.new.example.com. from zone old.example.com
 $ ndcli delete zone new.example.com --cleanup

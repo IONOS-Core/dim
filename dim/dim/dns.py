@@ -195,10 +195,17 @@ def check_new_rr(new_rr):
                 .filter(~RR.type.in_(('NS', 'DS'))).count():
             raise InvalidParameterError('%s cannot be created because other RRs with the same name exist' % new_rr)
         # Check for conflicting records under the DNAME subtree
-        dname_prefix = new_rr.name[:-1] if new_rr.name.endswith('.') else new_rr.name
-        if _same_view_or_different_zone(new_rr)\
-                .filter(RR.name.like(dname_prefix + '.%')).count():
-            raise InvalidParameterError('%s cannot be created because RRs exist under the DNAME subtree' % new_rr)
+        # Records under the DNAME subtree are those that are subdomains of the DNAME
+        dname_name = new_rr.name if new_rr.name.endswith('.') else new_rr.name + '.'
+        
+        # Find all records that could be under this DNAME subtree
+        all_records = _same_view_or_different_zone(new_rr).filter(RR.name != dname_name).all()
+        
+        for record in all_records:
+            record_name = record.name if record.name.endswith('.') else record.name + '.'
+            # Check if this record is a subdomain of the DNAME
+            if record_name != dname_name and record_name.endswith('.' + dname_name):
+                raise InvalidParameterError('%s cannot be created because RRs exist under the DNAME subtree' % new_rr)
     elif new_rr.type == 'PTR':
         if _same_view_or_different_zone(new_rr)\
                 .filter(RR.type == 'CNAME').filter(RR.name == new_rr.name).count():
@@ -214,8 +221,12 @@ def check_new_rr(new_rr):
         # Check if new record is under a DNAME subtree
         dname_records = _same_view_or_different_zone(new_rr).filter(RR.type == 'DNAME').all()
         for dname in dname_records:
-            dname_prefix = dname.name[:-1] if dname.name.endswith('.') else dname.name
-            if new_rr.name.startswith(dname_prefix + '.'):
+            # Normalize names by ensuring they end with a dot
+            dname_name = dname.name if dname.name.endswith('.') else dname.name + '.'
+            new_rr_name = new_rr.name if new_rr.name.endswith('.') else new_rr.name + '.'
+            
+            # Check if the new record is a subdomain under the DNAME
+            if new_rr_name != dname_name and new_rr_name.endswith('.' + dname_name):
                 raise InvalidParameterError('%s cannot be created under DNAME subtree %s' % (new_rr, dname.name))
 
 
