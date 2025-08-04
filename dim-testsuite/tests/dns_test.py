@@ -601,6 +601,96 @@ class TXT(RPCTest):
             self.r.rr_create(name=rr_name, type='TXT', strings=original)
             assert self.r.rr_list(rr_name)[0]['value'] == canonical[original]
 
+    def test_dname_create(self):
+        """Test basic DNAME record creation"""
+        self.r.zone_create('old.example.com')
+        self.r.zone_create('new.example.com')
+        
+        # Create basic DNAME record
+        self.r.rr_create(name='dept.old.example.com.', type='DNAME', target='dept.new.example.com.')
+        rrs_result = self.r.rr_list('dept.old.example.com.')
+        assert len(rrs_result) == 1
+        assert rrs_result[0]['type'] == 'DNAME'
+        assert rrs_result[0]['value'] == 'dept.new.example.com.'
+
+    def test_dname_zone_apex_forbidden(self):
+        """Test that DNAME cannot be created at zone apex"""
+        self.r.zone_create('old.example.com')
+        self.r.zone_create('new.example.com')
+        
+        with raises(InvalidParameterError, 'It is not allowed to create a DNAME for a zone'):
+            self.r.rr_create(name='old.example.com.', type='DNAME', target='new.example.com.')
+
+    def test_dname_conflicts_with_other_records(self):
+        """Test that DNAME cannot coexist with other records at same name"""
+        self.r.zone_create('test.com')
+        
+        # Create A record first
+        self.r.rr_create(name='conflict.test.com.', type='A', ip='1.2.3.4')
+        
+        # Try to create DNAME at same name - should fail
+        with raises(InvalidParameterError, 'cannot be created because other RRs with the same name exist'):
+            self.r.rr_create(name='conflict.test.com.', type='DNAME', target='target.example.com.')
+
+    def test_other_records_conflict_with_dname(self):
+        """Test that other records cannot be created at same name as DNAME"""
+        self.r.zone_create('test.com')
+        
+        # Create DNAME first
+        self.r.rr_create(name='dept.test.com.', type='DNAME', target='dept.example.com.')
+        
+        # Try to create A record at same name - should fail
+        with raises(InvalidParameterError, 'cannot be created because a DNAME with the same name exists'):
+            self.r.rr_create(name='dept.test.com.', type='A', ip='1.2.3.4')
+
+    def test_dname_subtree_conflict(self):
+        """Test that records cannot be created under DNAME subtree"""
+        self.r.zone_create('test.com')
+        
+        # Create DNAME first
+        self.r.rr_create(name='dept.test.com.', type='DNAME', target='dept.example.com.')
+        
+        # Try to create record under DNAME subtree - should fail
+        with raises(InvalidParameterError, 'cannot be created under DNAME subtree'):
+            self.r.rr_create(name='hr.dept.test.com.', type='A', ip='1.2.3.4')
+
+    def test_dname_existing_subtree_conflict(self):
+        """Test that DNAME cannot be created if records exist under the subtree"""
+        self.r.zone_create('test.com')
+        
+        # Create record under subtree first
+        self.r.rr_create(name='marketing.dept.test.com.', type='A', ip='1.2.3.4')
+        
+        # Try to create DNAME - should fail
+        with raises(InvalidParameterError, 'cannot be created because RRs exist under the DNAME subtree'):
+            self.r.rr_create(name='dept.test.com.', type='DNAME', target='dept.example.com.')
+
+    def test_dname_delete(self):
+        """Test DNAME record deletion"""
+        self.r.zone_create('old.example.com')
+        self.r.zone_create('new.example.com')
+        
+        # Create DNAME record
+        self.r.rr_create(name='dept.old.example.com.', type='DNAME', target='dept.new.example.com.')
+        assert len(self.r.rr_list('dept.old.example.com.')) == 1
+        
+        # Delete DNAME record
+        self.r.rr_delete(name='dept.old.example.com.', type='DNAME', target='dept.new.example.com.')
+        assert len(self.r.rr_list('dept.old.example.com.')) == 0
+
+    def test_dname_multiple_non_conflicting(self):
+        """Test that multiple DNAME records can coexist if they don't conflict"""
+        self.r.zone_create('old.example.com')
+        self.r.zone_create('new.example.com')
+        
+        # Create multiple DNAME records
+        self.r.rr_create(name='dept1.old.example.com.', type='DNAME', target='dept1.new.example.com.')
+        self.r.rr_create(name='dept2.old.example.com.', type='DNAME', target='dept2.new.example.com.')
+        
+        # Both should exist
+        assert len(self.r.rr_list('dept1.old.example.com.')) == 1
+        assert len(self.r.rr_list('dept2.old.example.com.')) == 1
+
 
 class IpblockRRs(RPCTest):
     def setUp(self):

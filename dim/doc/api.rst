@@ -111,7 +111,7 @@ When creating or specifying a RR, the following options are available:
 
 - *name* (string): the fqdn of the RR or the relative name if *zone* was
   specified; it can be omitted if *type* is PTR and the *ip* is specified
-- *type* (string): one of the supported RR types (A, AAAA, PTR, CNAME, MX, NS,
+- *type* (string): one of the supported RR types (A, AAAA, PTR, CNAME, DNAME, MX, NS,
   SRV, TXT, SPF, RP, CERT, HINFO, NAPTR)
 - :ref:`layer3domain_option`. The layer3domain value is optional when specifying a RR
   if there is only one RR with that name, type and value.
@@ -122,6 +122,7 @@ specified differently for each type:
 - A/AAAA: *ip*
 - PTR: *ptrdname*
 - CNAME: *cname*
+- DNAME: *target*
 - MX: *preference*, *exchange*
 - NS: *nsdname*
 - SRV: *priority*, *weight*, *port*, *target*

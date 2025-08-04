@@ -186,6 +186,19 @@ def check_new_rr(new_rr):
                 .filter(or_(RR.name == new_rr.name,
                             and_(~RR.type.in_(('CNAME', 'PTR')), RR.target == new_rr.name))).count():
             raise InvalidParameterError('%s cannot be created because other RRs with the same name or target exist' % new_rr)
+    elif new_rr.type == 'DNAME':
+        if new_rr.name == new_rr.view.zone.name + '.':
+            raise InvalidParameterError('It is not allowed to create a DNAME for a zone')
+        # DNAME cannot coexist with other records at the same name (except NS and DS at zone cuts)
+        if _same_view_or_different_zone(new_rr)\
+                .filter(RR.name == new_rr.name)\
+                .filter(~RR.type.in_(('NS', 'DS'))).count():
+            raise InvalidParameterError('%s cannot be created because other RRs with the same name exist' % new_rr)
+        # Check for conflicting records under the DNAME subtree
+        dname_prefix = new_rr.name[:-1] if new_rr.name.endswith('.') else new_rr.name
+        if _same_view_or_different_zone(new_rr)\
+                .filter(RR.name.like(dname_prefix + '.%')).count():
+            raise InvalidParameterError('%s cannot be created because RRs exist under the DNAME subtree' % new_rr)
     elif new_rr.type == 'PTR':
         if _same_view_or_different_zone(new_rr)\
                 .filter(RR.type == 'CNAME').filter(RR.name == new_rr.name).count():
@@ -194,6 +207,16 @@ def check_new_rr(new_rr):
         if _same_view_or_different_zone(new_rr)\
                 .filter(RR.type == 'CNAME').filter(or_(RR.name == new_rr.name, RR.name == new_rr.target)).count():
             raise InvalidParameterError('%s cannot be created because a CNAME with the same name exists' % new_rr)
+        # Check if new record conflicts with existing DNAME records
+        if _same_view_or_different_zone(new_rr)\
+                .filter(RR.type == 'DNAME').filter(RR.name == new_rr.name).count():
+            raise InvalidParameterError('%s cannot be created because a DNAME with the same name exists' % new_rr)
+        # Check if new record is under a DNAME subtree
+        dname_records = _same_view_or_different_zone(new_rr).filter(RR.type == 'DNAME').all()
+        for dname in dname_records:
+            dname_prefix = dname.name[:-1] if dname.name.endswith('.') else dname.name
+            if new_rr.name.startswith(dname_prefix + '.'):
+                raise InvalidParameterError('%s cannot be created under DNAME subtree %s' % (new_rr, dname.name))
 
 
 def create_single_rr(name, rr_type, zone, view, user, overwrite=False, **kwargs):

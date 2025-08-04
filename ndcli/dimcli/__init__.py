@@ -519,6 +519,7 @@ the start of the view list).'''},
     'caa': {'arguments': [Argument('caa_flags'),
                           Argument('property_tag'),
                           Argument('property_value')]},
+    'dname': {'arguments': [Argument('target')]},
     }
 RR_FIELDS['aaaa'] = RR_FIELDS['a']
 rr_types = list(RR_FIELDS.keys()) + ['soa']
