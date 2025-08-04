@@ -186,6 +186,18 @@ def check_new_rr(new_rr):
                 .filter(or_(RR.name == new_rr.name,
                             and_(~RR.type.in_(('CNAME', 'PTR')), RR.target == new_rr.name))).count():
             raise InvalidParameterError('%s cannot be created because other RRs with the same name or target exist' % new_rr)
+    elif new_rr.type == 'ALIAS':
+        # Check if zone is DNSSEC-enabled
+        if _is_zone_dnssec_enabled(new_rr.view.zone):
+            raise InvalidParameterError('ALIAS records are not supported in DNSSEC-enabled zones')
+        # ALIAS cannot coexist with CNAME
+        if _same_view_or_different_zone(new_rr)\
+                .filter(RR.type == 'CNAME').filter(RR.name == new_rr.name).count():
+            raise InvalidParameterError('%s cannot be created because a CNAME with the same name exists' % new_rr)
+        # Only one ALIAS record per name (like CNAME)
+        if _same_view_or_different_zone(new_rr)\
+                .filter(RR.type == 'ALIAS').filter(RR.name == new_rr.name).count():
+            raise InvalidParameterError('%s cannot be created because other RRs with the same name exist' % new_rr)
     elif new_rr.type == 'PTR':
         if _same_view_or_different_zone(new_rr)\
                 .filter(RR.type == 'CNAME').filter(RR.name == new_rr.name).count():
@@ -194,6 +206,10 @@ def check_new_rr(new_rr):
         if _same_view_or_different_zone(new_rr)\
                 .filter(RR.type == 'CNAME').filter(or_(RR.name == new_rr.name, RR.name == new_rr.target)).count():
             raise InvalidParameterError('%s cannot be created because a CNAME with the same name exists' % new_rr)
+        # Check if new record conflicts with existing ALIAS records
+        if new_rr.type != 'ALIAS' and _same_view_or_different_zone(new_rr)\
+                .filter(RR.type == 'ALIAS').filter(RR.name == new_rr.name).count():
+            raise InvalidParameterError('%s cannot be created because an ALIAS with the same name exists' % new_rr)
 
 
 def create_single_rr(name, rr_type, zone, view, user, overwrite=False, **kwargs):
@@ -262,6 +278,11 @@ def create_single_rr(name, rr_type, zone, view, user, overwrite=False, **kwargs)
 def _same_view_or_different_zone(rr):
     '''Return other rrs in the same view or different zones'''
     return RR.query.join(RR.view).filter(RR.id != rr.id).filter(or_(RR.view == rr.view, ZoneView.zone != rr.view.zone))
+
+
+def _is_zone_dnssec_enabled(zone):
+    '''Check if a zone has DNSSEC enabled (has keys)'''
+    return zone.is_signed()
 
 
 def orphaned_references(rr, to_delete=None):

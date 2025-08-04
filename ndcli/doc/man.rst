@@ -72,5 +72,54 @@ fail with the message::
 If this happens, you can safely retry the command later. If the error persists,
 please contact the administrator.
 
+Record Types
+============
+
+ALIAS Records
+-------------
+
+ALIAS records provide CNAME-like functionality but can coexist with other record types at the same name, making them particularly useful at zone apex where CNAME records are prohibited by DNS standards.
+
+**Usage:**
+  ``ndcli create rr NAME alias TARGET``
+
+**Key Features:**
+
+- Can be created at zone apex (unlike CNAME)
+- Can coexist with other record types (MX, TXT, NS, etc.)
+- Cannot coexist with CNAME records (mutual exclusion)
+- Only one ALIAS record allowed per name
+- Target must be a fully qualified domain name (FQDN)
+
+**DNSSEC Considerations:**
+
+- ALIAS records are not supported in DNSSEC-enabled zones
+- DNSSEC cannot be enabled on zones containing ALIAS records
+- This is a security requirement as specified in draft-ietf-dnsop-aname-04
+
+**Examples:**
+
+Create an ALIAS record at zone apex::
+
+    ndcli create rr example.com. alias host.target.com.
+
+Create an ALIAS record for a subdomain::
+
+    ndcli create rr www.example.com. alias cdn.provider.com.
+
+ALIAS records can coexist with other records at the same name::
+
+    ndcli create rr example.com. alias host.target.com.
+    ndcli create rr example.com. mx 10 mail.example.com.
+    ndcli create rr example.com. txt "v=spf1 include:_spf.example.com ~all"
+
+**Error Conditions:**
+
+- Creating ALIAS with existing CNAME at same name will fail
+- Creating CNAME with existing ALIAS at same name will fail
+- Creating multiple ALIAS records at same name will fail
+- Creating ALIAS in DNSSEC-enabled zone will fail
+- Enabling DNSSEC on zone with ALIAS records will fail
+
 
 .. include:: gendoc.txt

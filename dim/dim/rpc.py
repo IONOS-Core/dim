@@ -1939,6 +1939,9 @@ class RPC(object):
                            nsec3_algorithm=0, nsec3_iterations=0, nsec3_salt='-'):
         zone = get_zone(zone_name, False)
         self.user.can_manage_zone(zone)
+        # Check if zone contains ALIAS records
+        if self._zone_has_alias_records(zone):
+            raise InvalidParameterError('DNSSEC cannot be enabled on zones containing ALIAS records')
         Zone.check_nsec3params(nsec3_algorithm, nsec3_iterations, nsec3_salt)
         defaults = dict(default_algorithm=algorithm,
                         default_ksk_bits=ksk_bits,
@@ -2029,6 +2032,11 @@ class RPC(object):
         delete_ds_rr(key, user=self.user)
         OutputUpdate.send_dnssec_update(key.zone, "delete " + key.label)
         db.session.delete(key)
+
+    def _zone_has_alias_records(self, zone):
+        '''Check if a zone contains any ALIAS records'''
+        from dim.models import RR, ZoneView
+        return db.session.query(RR).join(ZoneView).filter(ZoneView.zone == zone, RR.type == 'ALIAS').count() > 0
 
     @updating
     def zone_dnssec_disable(self, zone_name):
