@@ -335,7 +335,6 @@ Install rpms of dim, dimclient, ndcli and jdk::
 # dnf install https://github.com/ionos-core/dim/releases/download/dim-4.0.9/dim-4.0.9-1.el8.x86_64.rpm
 # dnf install https://github.com/ionos-core/dim/releases/download/dimclient-0.4.5/python3-dimclient-0.4.5-1.el8.x86_64.rpm
 # dnf install https://github.com/ionos-core/dim/releases/download/ndcli-4.0.3/python3-ndcli-4.0.3-1.el8.x86_64.rpm
-# dnf install https://github.com/ionos-core/dim/releases/download/dim-web-0.1/python3-dim-web-0.1-1.el8.x86_64.rpm
 ```
 
 pdns-output needs to be build manually at the moment (any volunteers?)
@@ -459,8 +458,6 @@ setup wsgi.conf
   DocumentRoot /srv/http/dim.example.com
   WSGIDaemonProcess dim python-home=/opt/dim
   WSGIScriptAlias /dim /opt/dim/dim.wsgi
-  WSGIDaemonProcess cas
-  WSGIScriptAlias /cas /usr/share/dim-web/cas.wsgi
   <Directory /srv/http/dim.example.com>
     RewriteEngine on
     RewriteCond %{REQUEST_FILENAME} -f [OR]
@@ -474,10 +471,6 @@ setup wsgi.conf
   </Directory>
   Alias /dim/doc  /opt/dim/doc
   Alias /netdot/doc  /opt/dim/doc
-  <Location /cas>
-    WSGIProcessGroup cas
-    Require all granted
-  </Location>
   <Location /dim>
     WSGIProcessGroup dim
     Require all granted
