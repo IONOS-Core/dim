@@ -20,7 +20,7 @@ jobs:
   pytest_dim:
     runs-on: ubuntu-latest
     container:
-      image: oraclelinux:8
+      image: oraclelinux:9
     services:
       mariadb:
         image: mariadb:10.11
@@ -32,7 +32,7 @@ jobs:
         options: '--health-cmd="healthcheck.sh --su-mysql --connect --innodb_initialized" --health-interval=5s --health-timeout=2s --health-retries=4'
     steps:
       - name: Install dependencies
-        run: /bin/dnf install --assumeyes gcc python39-devel mariadb-devel git python39 make tar gzip
+        run: /bin/dnf install --assumeyes gcc python3-devel mariadb-devel git python3 make tar gzip
       - name: Check out repository code
         uses: actions/checkout@v3
       - name: Prepare virtual environment
