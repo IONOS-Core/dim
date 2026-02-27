@@ -31,6 +31,8 @@ jobs:
           MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: 'yes'
         options: '--health-cmd="healthcheck.sh --su-mysql --connect --innodb_initialized" --health-interval=5s --health-timeout=2s --health-retries=4'
     steps:
+      - name: Enable CRB repository for MariaDB dependencies
+        run: /bin/dnf config-manager --set-enabled ol9_codeready_builder
       - name: Install dependencies
         run: /bin/dnf install --assumeyes gcc python3-devel mariadb-devel git python3 make tar gzip
       - name: Check out repository code
