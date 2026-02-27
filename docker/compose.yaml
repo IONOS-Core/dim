@@ -73,34 +73,6 @@ services:
       dim:
         ipv4_address: 10.10.0.102
 
-  dim-web:
-    container_name: dim-web
-    build:
-      context: ../dim-web/
-      dockerfile: Dockerfile
-      args:
-        - DIM_LOGIN=http://dim-nginx:8000/login
-        - DIM_RPC=http://dim-nginx:8000/jsonrpc
-        - LOGIN=http://dim-nginx:8000/dim-cas/
-        - LOGOUT=http://dim-nginx:8000/dim-cas/logout
-        - BASE_URL=/web
-    depends_on:
-      - dim
-    networks:
-      dim:
-        ipv4_address: 10.10.0.103
-
-  dim-cas:
-    container_name: dim-cas
-    build: ../dim-cas/
-    volumes:
-      - ./conf/cas.cfg:/etc/cas/cas.cfg:ro
-    depends_on:
-      - dim
-    networks:
-      dim:
-        ipv4_address: 10.10.0.104
-
   pdns-output:
     container_name: pdns-output
     build: ../pdns-output/
@@ -113,22 +85,6 @@ services:
     networks:
       dim:
         ipv4_address: 10.10.0.105
-
-  cas:
-    build:
-      context: ./cas
-      args:
-        LDAP_PORT: ${LDAP_PORT:-389}
-        LDAP_ADMIN_PASSWORD: ${LDAP_ADMIN_PASSWORD:-admin}
-    container_name: cas
-    volumes:
-      - ./cas/config-run:/etc/cas/config
-    ports:
-      - "${CAS_PORT:-8443}:8443"
-    restart: unless-stopped
-    networks:
-      dim:
-        ipv4_address: 10.10.0.106
 
   openldap:
     image: osixia/openldap:1.5.0
