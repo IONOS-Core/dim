@@ -34,7 +34,7 @@ jobs:
       - name: Install dependencies
         run: /bin/dnf install --assumeyes gcc python3-devel mariadb-devel git python3 make tar gzip
       - name: Check out repository code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
       - name: Prepare virtual environment
         run: make install-test
         working-directory: dim-testsuite
