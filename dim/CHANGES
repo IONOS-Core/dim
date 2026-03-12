@@ -6,6 +6,7 @@
 * fix missing check if pool is already in target layer3domain (#232)
 * fix missing check to avoid creating A or AAAA records in zone profiles (#238)
 * update dependencies (#248)
+* add exact match option to :func:`rr_list`/``rr_list2`` to allow listing literal wildcard records (#298)
 
 5.0.1
 -----
@@ -428,4 +429,3 @@ API Changes:
     * *vlan* option for :func:`ippool_create`, :func:`ippool_set_vlan`
     * *priority* parameter for :func:`subnet_set_priority`
     * *prefix*, *maxsplit* parameters for :func:`ippool_get_delegation`
-

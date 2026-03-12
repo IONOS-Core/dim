@@ -2286,7 +2286,8 @@ class RPC(object):
 
     @readonly
     def rr_list(self, pattern=None, type=None, zone=None, view=None, profile=False, limit=None, offset=0,
-                value_as_object=False, fields=False, created_by=None, modified_by=None, layer3domain=None):
+                value_as_object=False, fields=False, created_by=None, modified_by=None, layer3domain=None,
+                exact=False):
         qfields = [RR.name, Zone.name.label('zone'), ZoneView.name.label('view'), RR.ttl, RR.type, RR.value,
                    Layer3Domain.name.label('layer3domain')]
         if fields:
@@ -2320,22 +2321,31 @@ class RPC(object):
             rr_query = rr_query.filter(RR.modified_by == modified_by)
             if soa_query:
                 soa_query = soa_query.filter(ZoneView.modified_by == modified_by)
-        try:
-            ip = IP(pattern)
-        except:
-            ip = None
+        ip = None
+        if pattern is not None and not exact:
+            try:
+                ip = IP(pattern)
+            except:
+                ip = None
         if ip:
             rr_query = rr_query.filter(inside(Ipblock.address, ip))
             soa_query = None
         elif pattern is not None:
-            if len(pattern) > 0 and pattern[-1] not in ['*', '?', '.']:
-                pattern += '.'
-            wildcard = make_wildcard(pattern)
             columns = [RR.name, RR.target]
-            rr_query = rr_query.filter(or_(*[col.like(wildcard) for col in columns]))
-            if soa_query is not None:
-                soa_query = soa_query.filter(or_((Zone.name + '.').like(wildcard),
-                                                 ZoneView.primary.like(wildcard)))
+            search_value = pattern
+            if len(search_value) > 0 and search_value[-1] not in ['*', '?', '.']:
+                search_value += '.'
+            if exact:
+                rr_query = rr_query.filter(or_(*[col == search_value for col in columns]))
+                if soa_query is not None:
+                    soa_query = soa_query.filter(or_((Zone.name + '.') == search_value,
+                                                     ZoneView.primary == search_value))
+            else:
+                wildcard = make_wildcard(search_value)
+                rr_query = rr_query.filter(or_(*[col.like(wildcard) for col in columns]))
+                if soa_query is not None:
+                    soa_query = soa_query.filter(or_((Zone.name + '.').like(wildcard),
+                                                     ZoneView.primary.like(wildcard)))
         # We can't limit reverse zones records because we can't do the same sorting in the query
         if limit is not None and not reverse_zone_sorting:
             limit = int(limit)
@@ -2430,7 +2440,7 @@ class RPC(object):
     @readonly
     def rr_list2(self, pattern=None, type=None, zone=None, view=None, profile=False, limit=None, offset=0,
                 value_as_object=False, fields=False, created_by=None, modified_by=None, layer3domain=None,
-                type_sort='asc', sort_by='record', order='asc'):
+                type_sort='asc', sort_by='record', order='asc', exact=False):
         qfields = [RR.name, Zone.name.label('zone'), ZoneView.name.label('view'), RR.ttl, RR.type, RR.value,
                    Layer3Domain.name.label('layer3domain')]
         if fields:
@@ -2464,22 +2474,31 @@ class RPC(object):
             rr_query = rr_query.filter(RR.modified_by == modified_by)
             if soa_query:
                 soa_query = soa_query.filter(ZoneView.modified_by == modified_by)
-        try:
-            ip = IP(pattern)
-        except:
-            ip = None
+        ip = None
+        if pattern is not None and not exact:
+            try:
+                ip = IP(pattern)
+            except:
+                ip = None
         if ip:
             rr_query = rr_query.filter(inside(Ipblock.address, ip))
             soa_query = None
         elif pattern is not None:
-            if len(pattern) > 0 and pattern[-1] not in ['*', '?', '.']:
-                pattern += '.'
-            wildcard = make_wildcard(pattern)
             columns = [RR.name, RR.target]
-            rr_query = rr_query.filter(or_(*[col.like(wildcard) for col in columns]))
-            if soa_query is not None:
-                soa_query = soa_query.filter(or_((Zone.name + '.').like(wildcard),
-                                                 ZoneView.primary.like(wildcard)))
+            search_value = pattern
+            if len(search_value) > 0 and search_value[-1] not in ['*', '?', '.']:
+                search_value += '.'
+            if exact:
+                rr_query = rr_query.filter(or_(*[col == search_value for col in columns]))
+                if soa_query is not None:
+                    soa_query = soa_query.filter(or_((Zone.name + '.') == search_value,
+                                                     ZoneView.primary == search_value))
+            else:
+                wildcard = make_wildcard(search_value)
+                rr_query = rr_query.filter(or_(*[col.like(wildcard) for col in columns]))
+                if soa_query is not None:
+                    soa_query = soa_query.filter(or_((Zone.name + '.').like(wildcard),
+                                                     ZoneView.primary.like(wildcard)))
 
         rr_count = fast_count(rr_query)
         soa_count = 0

@@ -2542,6 +2542,7 @@ delegation).''')
                   Argument('wildcard'),
                   rr_type_arg,
                   layer3domain_group,
+                  Option(None, 'exact', action='store_true', help='match only exact record names'),
                   script_option)
     def list_rrs(self, args):
         '''
@@ -2550,7 +2551,8 @@ delegation).''')
         options = OptionDict(pattern=args.wildcard)
         # do not use get_layer3domain() as CNAMEs etc. do not have a layer3domain
         options.set_if(type=args.type,
-                       layer3domain=args.get('layer3domain'))
+                       layer3domain=args.get('layer3domain'),
+                       exact=args.exact)
         logger.info("Result for list rrs %s" % args.wildcard)
         rrs = self.client.rr_list(**options)
         _print_table(['record', {},

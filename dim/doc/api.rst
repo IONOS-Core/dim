@@ -1180,6 +1180,7 @@ RR Functions
    - *limit*: limit the amount of results
    - *offset*: skip the first *offset* results
    - *pattern* (string): pattern to match against the RR name or IP address. A relative pattern will be converted into an absolute one.
+   - *exact* (boolean): if true, the *pattern* is treated as a literal RR name instead of a wildcard/glob
    - *type* (string): filter by RR type
    - *zone* (string): filter by RR zone
    - *view* (string): :ref:`view_option`

@@ -1,6 +1,7 @@
 5.0.4
 -----
 * fix TXT records when importing zone (#292)
+* add ``--exact`` switch to ``list rrs`` for literal wildcard records (#298)
 
 5.0.3
 -----
