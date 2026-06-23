@@ -1646,17 +1646,68 @@ class CLI(object):
     @cmd.register('list containers',
                   layer3domain_group,
                   Argument('container', nargs='?'),
+                  Option('T', 'tree',
+                         help='render as visual tree with Unicode box-drawing characters'),
+                  Option('p', 'pattern', action='store',
+                         help='regex to filter tree output (implies -T; shows matching nodes with full ancestor path and all children)'),
+                  Option('c', 'case-sensitive', dest='case_sensitive',
+                         help='case-sensitive pattern matching (default: case-insensitive)'),
+                  Option(None, 'no-color', dest='no_color',
+                         help='disable ANSI highlighting of matched terms'),
                   help='list the children of a container')
     def list_containers(self, args):
+        use_tree = args.tree or bool(args.get('pattern'))
+        pattern_str = args.get('pattern')
+        case_sensitive = args.get('case_sensitive')
+        no_color = args.get('no_color')
+
+        HIGHLIGHT_ON = '\033[1;33m'
+        HIGHLIGHT_OFF = '\033[0m'
+
+        def node_text(node):
+            attributes = ['(%s)' % node['status']]
+            if 'pool' in node:
+                attributes.append('pool:%s' % node['pool'])
+            attributes.extend(['%s:%s' % (k, v) for k, v in sorted(node.get('attributes', {}).items())])
+            return '%s %s' % (node['ip'], ' '.join(attributes))
+
         def print_tree(tree, level: int):
             for node in tree:
-                attributes = ['(%s)' % node['status']]
-                if 'pool' in node:
-                    attributes.append('pool:%s' % node['pool'])
-                attributes.extend(['%s:%s' % (k, v) for k, v in sorted(node.get('attributes', {}).items())])
-                print('  ' * level + '%s %s' % (node['ip'], ' '.join(attributes)))
+                print('  ' * level + node_text(node))
                 if 'children' in node:
                     print_tree(node['children'], level + 1)
+
+        def filter_tree(tree, regex):
+            """Return pruned tree: matching nodes (with all their children) and their ancestors."""
+            result = []
+            for node in tree:
+                if regex.search(node_text(node)):
+                    result.append(node)  # keep node with all original children
+                else:
+                    filtered_children = filter_tree(node.get('children', []), regex)
+                    if filtered_children:
+                        new_node = dict(node)
+                        new_node['children'] = filtered_children
+                        result.append(new_node)
+            return result
+
+        def render_unicode(tree, prefix='', regex=None, use_color=False):
+            lines = []
+            for i, node in enumerate(tree):
+                is_last = (i == len(tree) - 1)
+                connector = '└── ' if is_last else '├── '
+                text = node_text(node)
+                if use_color and regex:
+                    text = regex.sub(
+                        lambda m: HIGHLIGHT_ON + m.group() + HIGHLIGHT_OFF, text)
+                lines.append(prefix + connector + text)
+                children = node.get('children', [])
+                if children:
+                    child_prefix = prefix + ('    ' if is_last else '│   ')
+                    child_output = render_unicode(children, child_prefix, regex, use_color)
+                    if child_output:
+                        lines.append(child_output)
+            return '\n'.join(lines)
         layer3domains: List[str] = []
         if args.layer3domain == "all" or get_layer3domain(args.layer3domain) is None:
             layer3domains = [l['name'] for l in self.client.layer3domain_list()]
@@ -1684,14 +1735,31 @@ class CLI(object):
         elif len(dim_errors) > 0:
             for dimerror in dim_errors:
                 logging.debug(dimerror)
+        regex = None
+        if pattern_str:
+            flags = 0 if case_sensitive else re.IGNORECASE
+            try:
+                regex = re.compile(pattern_str, flags)
+            except re.error as ex:
+                raise DimError('Invalid regex: %s' % ex)
+        use_color = regex is not None and not no_color and sys.stdout.isatty()
         idx = 0
         for layer3domain, result in results.items():
             if idx > 0:
                 print()
             _print_messages(result)
             if result['containers']:
+                containers = result['containers']
+                if use_tree and regex:
+                    containers = filter_tree(containers, regex)
+                    if not containers:
+                        logging.warning('No matches for pattern %r in layer3domain %s', pattern_str, layer3domain)
+                        continue
                 print('layer3domain: ' + layer3domain)
-                print_tree(result['containers'], 0)
+                if use_tree:
+                    print(render_unicode(containers, regex=regex, use_color=use_color))
+                else:
+                    print_tree(containers, 0)
                 idx += 1
 
     @cmd.register('list ips',
