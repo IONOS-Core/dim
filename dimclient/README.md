@@ -9,7 +9,7 @@ To use `dimclient`, install it in your Python environment.
 
 There are two options to do that:
 
-1. *Distribution packages:* Download and install a distribution-packaged package. There are packages for Linux distributions available at [openSUSE Build Service - home:zeromind:dim/dimclient](https://build.opensuse.org/package/show/home:zeromind:dim/dimclient).
+1. *Distribution packages:* Download and install a distribution-packaged package. There are packages for Linux distributions available at [openSUSE Build Service - network:dim/dimclient](https://build.opensuse.org/package/show/network:dim/dimclient).
    Note that distribution packages install the dimclient globally.
 2. *Python PIP:* [PyPI dimclient](https://pypi.org/project/dimclient/)
 

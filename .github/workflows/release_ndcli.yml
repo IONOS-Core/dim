@@ -19,7 +19,7 @@ jobs:
       - name: Activate CRB for dependencies
         run: /bin/dnf config-manager --enable ol9_codeready_builder
       - name: Add DIM repository from OBS for dimclient
-        run: /bin/dnf config-manager --add-repo https://download.opensuse.org/repositories/home:/zeromind:/dim/RockyLinux_9/home:zeromind:dim.repo
+        run: /bin/dnf config-manager --add-repo https://download.opensuse.org/repositories/network:/dim/RockyLinux_9/network:dim.repo
         working-directory: /etc/yum.repos.d
       - name: Install dependencies
         run: /bin/dnf install --assumeyes python3-sphinx python3-dns python3-dimclient
