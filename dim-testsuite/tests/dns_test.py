@@ -623,8 +623,6 @@ class TXT(RPCTest):
 
     def test_dname_conflicts_with_other_records(self):
         """Test that DNAME cannot coexist with other records at same name"""
-        self.r.zone_create('test.com')
-        
         # Create A record first
         self.r.rr_create(name='conflict.test.com.', type='A', ip='1.2.3.4')
         
@@ -634,8 +632,6 @@ class TXT(RPCTest):
 
     def test_other_records_conflict_with_dname(self):
         """Test that other records cannot be created at same name as DNAME"""
-        self.r.zone_create('test.com')
-        
         # Create DNAME first
         self.r.rr_create(name='dept.test.com.', type='DNAME', target='dept.example.com.')
         
@@ -645,8 +641,6 @@ class TXT(RPCTest):
 
     def test_dname_subtree_conflict(self):
         """Test that records cannot be created under DNAME subtree"""
-        self.r.zone_create('test.com')
-        
         # Create DNAME first
         self.r.rr_create(name='dept.test.com.', type='DNAME', target='dept.example.com.')
         
@@ -656,8 +650,6 @@ class TXT(RPCTest):
 
     def test_dname_existing_subtree_conflict(self):
         """Test that DNAME cannot be created if records exist under the subtree"""
-        self.r.zone_create('test.com')
-        
         # Create record under subtree first
         self.r.rr_create(name='marketing.dept.test.com.', type='A', ip='1.2.3.4')
         
