@@ -8,11 +8,14 @@ from dim.models import clean_database, User, Group, AccessRight, Layer3Domain, I
 
 
 @contextmanager
-def raises(error):
+def raises(error, message=None):
     try:
         yield
-    except error:
-        pass
+    except error as e:
+        if message is not None:
+            err_msg = str(e)
+            if message not in err_msg:
+                raise AssertionError("Expected exception message containing '%s' but got '%s'" % (message, err_msg))
     except Exception as e:
         logging.exception(e)
         raise AssertionError("Expected exception %s but got %s" % (error.__name__, e.__class__.__name__))
