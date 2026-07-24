@@ -167,18 +167,28 @@ class User(db.Model):
     ldap_uid = Column(Integer, unique=True, nullable=True)
     ldap_cn = Column(String(128), nullable=True)
     department_number = Column(Integer, nullable=True)
+    is_pseudo = Column(Boolean, nullable=True)
 
     groups = association_proxy('group_membership', 'group')
 
     user_type = relationship(UserType)
 
-    def __init__(self, username, user_type='User', ldap_uid=None, ldap_cn=None, department_number=None,
-                 register=True):
+    def __init__(
+        self,
+        username,
+        user_type="User",
+        ldap_uid=None,
+        ldap_cn=None,
+        department_number=None,
+        is_pseudo=None,
+        register=True,
+    ):
         self.username = username
         self.user_type = UserType.query.filter_by(name=user_type).one()  # TODO enum
         self.ldap_uid = ldap_uid
         self.ldap_cn = ldap_cn
         self.department_number = department_number
+        self.is_pseudo = is_pseudo
         if register:
             self.register()
 

@@ -6,7 +6,7 @@ from dim import db
 __all__ = ['SCHEMA_VERSION', 'SchemaInfo']
 
 
-SCHEMA_VERSION = '12'
+SCHEMA_VERSION = "13"
 
 
 class SchemaInfo(db.Model):

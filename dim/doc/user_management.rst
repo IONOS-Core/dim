@@ -20,3 +20,16 @@ If the department is deleted from LDAP, the associated user-group will lose this
 become a regular user-group.
 
 If a user name is found in LDAP, its ldap_cn and ldap_uid will also be updated by sync_ldap.
+
+
+Pseudo / Service Accounts
+-------------------------
+
+DIM supports synchronizing technical or pseudo-users (such as service accounts or API users) from a separate LDAP directory branch.
+
+To enable this, configure the ``LDAP_PSEUDO_USER_BASE`` variable in your ``dim.cfg``.
+
+If configured, ``sync_ldap`` will query both ``LDAP_USER_BASE`` (for standard accounts, setting ``is_pseudo = False``) and ``LDAP_PSEUDO_USER_BASE`` (for service accounts, setting ``is_pseudo = True``).
+
+If ``LDAP_PSEUDO_USER_BASE`` is left empty or matches the standard base, all users will be treated as standard users.
+
