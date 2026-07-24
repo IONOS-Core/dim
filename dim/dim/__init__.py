@@ -60,6 +60,31 @@ def create_app(db_mode: Optional[str] = None, testing: bool = False):
         sys.exit(1)
     db.init_app(app)
 
+    # Check if sql scheme is what the code expects to not run into wierd errors
+    if not testing:
+        from .models import SCHEMA_VERSION, SchemaInfo
+        # TODO: find a good way to make sure that this is only set on db commands
+        is_cli_db_command = "manage_db" in sys.argv[0] or "flask" in sys.argv[0]
+        try:
+            with app.app_context():
+                current_db_schema_version = SchemaInfo.current_version()
+                if current_db_schema_version != SCHEMA_VERSION:
+                    logging.critical(
+                        "DATABASE SCHEMA MISMATCH: Database version is %s, but code expects %s. "
+                        "Please run 'manage_db upgrade' before starting the application!",
+                        current_db_schema_version,
+                        SCHEMA_VERSION,
+                    )
+                    if not is_cli_db_command:
+                        sys.exit(
+                            1
+                        )  # Do we really want to exit here? My fear is that we never can run manage_db *
+        except:
+            logging.info(
+                "Could not verify database schema version on startup, database might be empty."
+                "We let the app running to allow 'manage_db *'"
+            )
+
     from .jsonrpc import jsonrpc
 
     app.register_blueprint(jsonrpc)
