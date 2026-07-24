@@ -63,6 +63,7 @@ def create_app(db_mode: Optional[str] = None, testing: bool = False):
     # Check if sql scheme is what the code expects to not run into wierd errors
     if not testing:
         from .models import SCHEMA_VERSION, SchemaInfo
+
         # TODO: find a good way to make sure that this is only set on db commands
         is_cli_db_command = "manage_db" in sys.argv[0] or "flask" in sys.argv[0]
         try:

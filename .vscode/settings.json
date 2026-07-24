@@ -1,0 +1,10 @@
+{
+    "python.analysis.extraPaths": [
+        "./dim",
+        "./ndcli",
+        "./dimclient"
+    ],
+    "editor.formatOnSave": true,
+    "editor.formatOnSaveMode": "modifications",
+    "python.formatting.provider": "none"
+}
