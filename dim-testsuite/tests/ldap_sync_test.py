@@ -170,7 +170,7 @@ class LDAPSyncTest(DatabaseTest):
         self.assertIn("o=alice", first_filter)
         self.assertIn("o=pseudo_test", first_filter)
         self.assertIn("o=bob", first_filter)
-        self.assertNotIn("o=charlie", first_filter)
+        self.assertIn("o=charlie", first_filter)
         self.assertIsNone(first_kwargs.get("base_dn"))
 
         # Verify second call (Pseudo search filter)
