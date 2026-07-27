@@ -165,8 +165,8 @@ def sync_users(ldap: LDAP, deletion_threshold: int = -1, ignore_deletion_thresho
     """
     db_users_all = User.query.all()
 
-    # Filter database users to only include those that are LDAP-synced
-    db_users = [u for u in db_users_all if u.ldap_uid is not None]
+    # We sync all database users (allowing newly logged-in users with ldap_uid=None to be populated)
+    db_users = db_users_all
 
     # Maps username (str) to the updated User object fetched from LDAP
     ldap_users: Dict[str, User] = {}
