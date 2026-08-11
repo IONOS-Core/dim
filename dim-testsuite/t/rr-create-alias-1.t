@@ -14,9 +14,11 @@ $ ndcli create rr host.target.com. a 192.168.1.100 -q
 
 # Test basic ALIAS record creation at zone apex
 $ ndcli create rr example.com. alias host.target.com.
+INFO - Creating RR @ ALIAS host.target.com. in zone example.com
 
 # Test ALIAS record creation at subdomain
 $ ndcli create rr www.example.com. alias host.target.com.
+INFO - Creating RR www ALIAS host.target.com. in zone example.com
 
 # Test that ALIAS can coexist with other records (unlike CNAME)
 $ ndcli create rr example.com. txt "v=spf1 include:_spf.example.com ~all" -q
@@ -27,8 +29,8 @@ $ ndcli list zone example.com
 record zone        ttl   type  value
 @      example.com 86400 SOA   localhost. hostmaster.example.com. 2012111402 14400 3600 605000 86400
 @      example.com       ALIAS host.target.com.
-@      example.com       MX    10 mail.example.com.
 @      example.com       TXT   "v=spf1 include:_spf.example.com ~all"
+@      example.com       MX    10 mail.example.com.
 www    example.com       ALIAS host.target.com.
 
 # Test that ALIAS cannot coexist with CNAME
@@ -39,7 +41,7 @@ ERROR - test.example.com. ALIAS host.target.com. cannot be created because a CNA
 # Test that CNAME cannot coexist with ALIAS
 $ ndcli create rr alias-test.example.com. alias host.target.com. -q
 $ ndcli create rr alias-test.example.com. cname host.target.com.
-ERROR - alias-test.example.com. CNAME host.target.com. cannot be created because an ALIAS with the same name exists
+ERROR - alias-test.example.com. CNAME host.target.com. cannot be created because other RRs with the same name or target exist
 
 # Test DNSSEC constraints - ALIAS records should not be allowed in DNSSEC-enabled zones
 $ ndcli create zone dnssec-test.com
@@ -78,8 +80,9 @@ ERROR - multi.example.com. ALIAS other.target.com. cannot be created because oth
 
 # Cleanup
 $ ndcli delete zone example.com --cleanup
-INFO - Deleting RR @ MX 10 mail.example.com. from zone example.com
 INFO - Deleting RR @ TXT "v=spf1 include:_spf.example.com ~all" from zone example.com
+INFO - Deleting RR @ MX 10 mail.example.com. from zone example.com
+INFO - Deleting RR alias-test ALIAS host.target.com. from zone example.com
 INFO - Deleting RR multi ALIAS host.target.com. from zone example.com
 INFO - Deleting RR test CNAME host.target.com. from zone example.com
 
