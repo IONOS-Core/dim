@@ -226,10 +226,9 @@ def check_new_rr(new_rr):
         if _same_view_or_different_zone(new_rr)\
                 .filter(RR.type == 'CNAME').filter(or_(RR.name == new_rr.name, RR.name == new_rr.target)).count():
             raise InvalidParameterError('%s cannot be created because a CNAME with the same name exists' % new_rr)
-        # Check if new record conflicts with existing ALIAS records
-        if new_rr.type != 'ALIAS' and _same_view_or_different_zone(new_rr)\
-                .filter(RR.type == 'ALIAS').filter(RR.name == new_rr.name).count():
-            raise InvalidParameterError('%s cannot be created because an ALIAS with the same name exists' % new_rr)
+        # ALIAS is only mutually exclusive with CNAME (see the CNAME branch above);
+        # it may coexist with any other type at the same name, which is the whole
+        # point of having it at a zone apex.
         # Check if new record conflicts with existing DNAME records
         if _same_view_or_different_zone(new_rr)\
                 .filter(RR.type == 'DNAME').filter(RR.name == new_rr.name).count():
