@@ -617,6 +617,10 @@ class OutputUpdate(db.Model):
     valid_actions = (CREATE_RR, DELETE_RR, UPDATE_SOA, CREATE_ZONE, REFRESH_ZONE, DELETE_ZONE,
                      DNSSEC_UPDATE)
 
+    # Rows per INSERT when fanning a whole zone out to an output; see
+    # _bulk_send_create_rrs().
+    BULK_ROWS_PER_INSERT = 5000
+
     # update metadata
     id = Column(BigInteger, primary_key=True, nullable=False)
     transaction = Column(String(16))
@@ -654,11 +658,59 @@ class OutputUpdate(db.Model):
             ttl=view.ttl,
             type='SOA',
             content=view.soa_value()))
-        for rr in RR.query.filter(RR.view == view):
-            OutputUpdate._send_rr_action_to_zone(rr, OutputUpdate.CREATE_RR, zone_name, output)
+        # Flush so the row above keeps the lower id: updates are consumed
+        # ordered by id, and the zone has to appear before its records. This
+        # also assigns output.id, which the bulk insert below needs.
+        db.session.flush()
+        OutputUpdate._bulk_send_create_rrs(view, zone_name, output)
         if view.zone.keys:
             OutputUpdate._send_dnssec_update_to_output("add keys " + ' '.join([key.label for key in view.zone.keys]),
                                                        zone_name, output)
+
+    @staticmethod
+    def _bulk_send_create_rrs(view, zone_name, output):
+        '''Insert a CREATE_RR update for every RR in *view*, in batches.
+
+        Deliberately bypasses the ORM. One OutputUpdate instance per RR means
+        one INSERT round trip per RR, because SQLAlchemy needs the generated id
+        of every instance and cannot batch those. Locally that is invisible,
+        but at a few ms of network latency a zone with a few hundred thousand
+        records takes tens of minutes to land in outputupdate.
+
+        Selecting plain columns instead of RR instances also keeps the identity
+        map from growing to one object per record.
+        '''
+        rr_zone_name = view.zone.name
+        total = 0
+        last_id = 0
+        while True:
+            # Paginate by id rather than streaming the whole select: MySQLdb
+            # refuses a new statement while an unread result set is open on the
+            # same connection, and the insert below runs on that connection.
+            batch = db.session.query(RR.id, RR.name, RR.ttl, RR.type, RR.value)\
+                .filter(RR.zoneview_id == view.id)\
+                .filter(RR.id > last_id)\
+                .order_by(RR.id)\
+                .limit(OutputUpdate.BULK_ROWS_PER_INSERT).all()
+            if not batch:
+                break
+            last_id = batch[-1][0]
+            db.session.execute(OutputUpdate.__table__.insert(), [
+                dict(transaction=g.tid,
+                     action=OutputUpdate.CREATE_RR,
+                     output_id=output.id,
+                     zone_name=zone_name,
+                     serial=view.serial,
+                     name=make_fqdn(RR.record_name(name, rr_zone_name), zone_name),
+                     # `or` rather than a None check to keep the pre-batching
+                     # behaviour: a ttl of 0 falls back to the zone ttl
+                     ttl=ttl or view.ttl,
+                     type=rr_type,
+                     content=value)
+                for _id, name, ttl, rr_type, value in batch])
+            total += len(batch)
+        logging.info('Sent %d %s updates for zone %s to output %s',
+                     total, OutputUpdate.CREATE_RR, zone_name, output.name)
 
     @staticmethod
     def _send_delete_zone(zone_name, output):
