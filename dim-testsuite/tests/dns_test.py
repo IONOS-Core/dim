@@ -1018,7 +1018,7 @@ class ALIAS(RPCTest):
         """Test that ALIAS can coexist with other record types (unlike CNAME)"""
         self.r.rr_create(name='example.com.', type='ALIAS', target='host.target.com.')
         self.r.rr_create(name='example.com.', type='MX', preference=10, exchange='mail.example.com.')
-        self.r.rr_create(name='example.com.', type='TXT', strings=['"v=spf1 include:_spf.example.com ~all"'])
+        self.r.rr_create(name='example.com.', type='TXT', strings=['v=spf1 include:_spf.example.com ~all'])
         
         records = self.r.rr_list(zone='example.com')
         record_types = set(rr['type'] for rr in records if rr['type'] != 'SOA')
