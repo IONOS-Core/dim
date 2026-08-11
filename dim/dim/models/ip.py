@@ -232,7 +232,11 @@ class AllocationHistory(db.Model):
 
 
 class Ipblock(db.Model, WithAttr, TrackChanges):
-    __table_constraints__ = (UniqueConstraint('address', 'prefix', 'layer3domain_id'), )
+    # 'version' is part of a block's identity: 0.0.0.0/0 and ::/0 both have
+    # address 0 and prefix 0, so without it they collide inside one layer3domain.
+    # It is appended so that the (address, prefix, layer3domain_id) index prefix
+    # stays intact -- ip.py hints this index by name in _set_parent().
+    __table_constraints__ = (UniqueConstraint('address', 'prefix', 'layer3domain_id', 'version'), )
 
     id = Column(BigInteger, primary_key=True, nullable=False)
     version = Column(Integer, index=True, nullable=False)
