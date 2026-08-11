@@ -1091,8 +1091,9 @@ class ALIAS(RPCTest):
         self.r.rr_create(name='example.com.', type='NS', nsdname='ns1.example.com.')
         self.r.rr_create(name='example.com.', type='MX', preference=10, exchange='mail.example.com.')
         
-        records = self.r.rr_list(zone='example.com', name='@')
-        record_types = set(rr['type'] for rr in records if rr['type'] != 'SOA')
+        records = self.r.rr_list(zone='example.com')
+        record_types = set(rr['type'] for rr in records
+                           if rr['record'] == '@' and rr['type'] != 'SOA')
         assert 'ALIAS' in record_types
         assert 'NS' in record_types
         assert 'MX' in record_types
