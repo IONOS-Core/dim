@@ -3,7 +3,7 @@ Version:    4.0.0
 Release:    3
 Summary:    DIM PDNS Output Service
 License:    MIT
-URL:        https://github.com/ionos-cloud/dim
+URL:        https://github.com/ionos-core/dim
 Requires:   java-1.8.0-openjdk-headless
 BuildRequires: java-1.8.0-openjdk-devel
 BuildRequires: systemd-units

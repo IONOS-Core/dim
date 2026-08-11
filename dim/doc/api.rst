@@ -111,7 +111,7 @@ When creating or specifying a RR, the following options are available:
 
 - *name* (string): the fqdn of the RR or the relative name if *zone* was
   specified; it can be omitted if *type* is PTR and the *ip* is specified
-- *type* (string): one of the supported RR types (A, AAAA, PTR, CNAME, ALIAS, MX, NS,
+- *type* (string): one of the supported RR types (A, AAAA, PTR, CNAME, ALIAS, DNAME, MX, NS,
   SRV, TXT, SPF, RP, CERT, HINFO, NAPTR)
 - :ref:`layer3domain_option`. The layer3domain value is optional when specifying a RR
   if there is only one RR with that name, type and value.
@@ -123,6 +123,20 @@ specified differently for each type:
 - PTR: *ptrdname*
 - CNAME: *cname*
 - ALIAS: *target*
+- DNAME: *target*
+- MX: *preference*, *exchange*
+- NS: *nsdname*
+- SRV: *priority*, *weight*, *port*, *target*
+- TXT/SPF: *strings* (can be either a list of strings or a single string
+  containing quoted strings)
+- RP: *mbox*, *txtdname*
+- CERT: *certificate_type*, *key_tag*, *algorithm*, *certificate*
+- HINFO: *cpu*, *os*
+- NAPTR: *order*, *preference*, *flags*, *service*, *regexp*, *replacement*
+
+The RR value is optional when specifying a RR if there are no other RRs with
+that name and type.
+
 
 ALIAS Records
 ~~~~~~~~~~~~~
@@ -163,19 +177,6 @@ The ALIAS record can coexist with other records at the same name::
 - Creating multiple ALIAS records at same name will fail
 - Creating ALIAS in DNSSEC-enabled zone will fail
 - Enabling DNSSEC on zone with ALIAS records will fail
-
-- MX: *preference*, *exchange*
-- NS: *nsdname*
-- SRV: *priority*, *weight*, *port*, *target*
-- TXT/SPF: *strings* (can be either a list of strings or a single string
-  containing quoted strings)
-- RP: *mbox*, *txtdname*
-- CERT: *certificate_type*, *key_tag*, *algorithm*, *certificate*
-- HINFO: *cpu*, *os*
-- NAPTR: *order*, *preference*, *flags*, *service*, *regexp*, *replacement*
-
-The RR value is optional when specifying a RR if there are no other RRs with
-that name and type.
 
 
 .. _layer3domain_option:

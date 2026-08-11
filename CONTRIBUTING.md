@@ -39,4 +39,4 @@ And must:
 * have one or more testcases in dim-testsuite/t
 
 Information on testsuite can be found in the repository at
-[/dim-testsuite/README.md](https://github.com/ionos-cloud/dim/blob/master/dim-testsuite/README.md)
+[/dim-testsuite/README.md](https://github.com/ionos-core/dim/blob/master/dim-testsuite/README.md)

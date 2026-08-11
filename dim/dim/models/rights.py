@@ -256,8 +256,11 @@ class User(db.Model):
 
     @permission
     def can_manage_zone(self, zone):
-        return self.has_any_access([('dns_admin', None),
-                                    ('zone_admin', zone)])
+        access_list = [('dns_admin', None), ('zone_admin', zone)]
+        # NetworkAdmin can manage reverse zones
+        if is_reverse_zone(zone.name):
+            access_list.append(('network_admin', None))
+        return self.has_any_access(access_list)
 
     @permission
     def can_create_rr(self, view, type):

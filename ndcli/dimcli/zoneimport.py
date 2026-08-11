@@ -20,6 +20,7 @@ rdata_params = {
     'AAAA': lambda rdata: dict(ip=rdata.address),
     'PTR': lambda rdata: dict(ptrdname=str(rdata.target)),
     'CNAME': lambda rdata: dict(cname=str(rdata.target)),
+    'DNAME': lambda rdata: dict(target=str(rdata.target)),
     'MX': lambda rdata: dict(preference=int(rdata.preference), exchange=str(rdata.exchange)),
     'NS': lambda rdata: dict(nsdname=str(rdata.target)),
     'TXT': lambda rdata: dict(strings=rdata.to_text()),

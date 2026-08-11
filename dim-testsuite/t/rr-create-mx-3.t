@@ -1,4 +1,4 @@
-# https://github.com/ionos-cloud/dim/issues/128
+# https://github.com/ionos-core/dim/issues/128
 #
 # RFC7505
 # " ... To indicate that a domain does not accept email, it advertises a single

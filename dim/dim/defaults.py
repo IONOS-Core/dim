@@ -9,7 +9,6 @@ DB_LOCK_TIMEOUT = 120
 ### Authentication
 # 'ldap' or None
 AUTHENTICATION_METHOD = 'ldap'
-CAS_URL = 'https://cas-url/'
 
 LDAP_SERVER = "ldap://ldap-url"
 LDAP_USER_DN = "uid=%s"

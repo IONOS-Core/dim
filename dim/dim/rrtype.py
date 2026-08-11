@@ -297,6 +297,11 @@ class CNAME(RRType):
     validate = {'cname': validate_target}
 
 
+class DNAME(RRType):
+    fields = ('target', )
+    validate = {'target': validate_target}
+
+
 class MX(RRType):
     fields = ('preference', 'exchange')
     validate = {'preference': validate_preference,

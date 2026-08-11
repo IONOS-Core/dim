@@ -4,7 +4,7 @@ import re
 import subprocess
 from collections import deque
 
-import pkg_resources
+import importlib.resources
 
 from dim.models import SchemaInfo, SCHEMA_VERSION, db
 
@@ -38,11 +38,11 @@ def migrate():
 
 def gather_graph():
     graph = {}
-    for script in pkg_resources.resource_listdir('dim', 'sql'):
-        m = re.match(r'(migrate|rollback)_(.*)_to_(.*).sql', script)
+    for script in importlib.resources.files("dim").joinpath("sql").iterdir():
+        m = re.match(r'(migrate|rollback)_(.*)_to_(.*).sql', script.name)
         if m:
             x, y = m.group(2), m.group(3)
-            graph.setdefault(x, []).append((y, script))
+            graph.setdefault(x, []).append((y, script.name))
     return graph
 
 
@@ -59,5 +59,7 @@ def run_script(new_version, script):
         cmd.append('-u%s' % url.username)
     if url.password:
         cmd.append('-p%s' % url.password)
-    stdin = open(pkg_resources.resource_filename('dim', 'sql/' + script))
-    subprocess.check_call(cmd, stdin=stdin)
+    ref = importlib.resources.files("dim") / "sql" / script
+    with importlib.resources.as_file(ref) as path:
+        with open(path) as stdin:
+            subprocess.check_call(cmd, stdin=stdin)

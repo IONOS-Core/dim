@@ -237,22 +237,22 @@ def add_regex(table, cmd):
         if re.search(b'list zone .* keys', cmd):
             for row in table:
                 row[0] = re.compile(b'.*_[zk]sk_.*')
-                row[2] = re.compile(b'\d*')
+                row[2] = re.compile(rb'\d*')
                 row[5] = re.compile(b'.*')
         if re.search(b'list zone .* dnskeys', cmd):
             for row in table:
-                row[0] = re.compile(b'\d*')
-                row[1] = re.compile(b'\d*')
+                row[0] = re.compile(rb'\d*')
+                row[1] = re.compile(rb'\d*')
                 row[3] = re.compile(b'.*')
         if re.search(b'list zone .* keys', cmd):
             for row in table:
                 row[0] = re.compile(b'.*')
-                row[2] = re.compile(b'\d*')
+                row[2] = re.compile(rb'\d*')
                 row[5] = re.compile(b'.*')
         if re.search(b'list zone .* ds', cmd):
             for row in table[1:]:
-                row[0] = re.compile(b'\d*')
-                row[2] = re.compile(b'\d')
+                row[0] = re.compile(rb'\d*')
+                row[2] = re.compile(rb'\d')
                 row[3] = re.compile(b'.*')
         if b'dcli list zone' in cmd or b'dcli dump zone' in cmd or b'dcli list rrs' in cmd:
             for rr_row in table:
@@ -260,22 +260,22 @@ def add_regex(table, cmd):
                     if (rr_col + 1) < len(rr_row):
                         if rr_row[rr_col] == b'SOA':
                             stuff = rr_row[rr_col + 1].split()
-                            rr_row[rr_col + 1] = re.compile(b'%s %s \d+ \d+ \d+ \d+ \d+' % (stuff[0], stuff[1]))
+                            rr_row[rr_col + 1] = re.compile(rb'%s %s \d+ \d+ \d+ \d+ \d+' % (stuff[0], stuff[1]))
                         elif rr_row[rr_col] == b'DS':
-                            rr_row[rr_col + 1] = re.compile(b'\d+ 8 2 .*')
+                            rr_row[rr_col + 1] = re.compile(rb'\d+ 8 2 .*')
         elif b'dcli history' in cmd:
             for row in table:
                 if row[0] != b'timestamp':
                     row[0] = re.compile(b'.*')
                 if row[-1].startswith(b'set_attr serial='):
-                    row[-1] = re.compile(b'set_attr serial=\d+')
+                    row[-1] = re.compile(rb'set_attr serial=\d+')
                 if row[4] == b'key':
                     row[5] = re.compile(b'.*')
     elif b'dnssec enable' in cmd or b'dnssec new' in cmd:
         check_regexes(table, [b'.*Created key .*_[zk]sk_.* for zone (.*)',
-                              b'.*Creating RR .* DS \d+ 8 2 .* in zone .*'])
+                              rb'.*Creating RR .* DS \d+ 8 2 .* in zone .*'])
     elif b'dnssec disable' in cmd or b'dnssec delete' in cmd or b'delete zone' in cmd:
-        check_regexes(table, [b'.*Deleting RR .* DS \d+ 8 2 .* from zone .*'])
+        check_regexes(table, [rb'.*Deleting RR .* DS \d+ 8 2 .* from zone .*'])
     return table
 
 

@@ -35,7 +35,7 @@ def zones_equal(a, b):
     '''Ignores differences in whitespace even inside strings'''
     ac = compact(a)
     bc = compact(b)
-    if len(ac) != len(bc) or any(re.sub('\s+', '', l1) != re.sub('\s+', '', l2)
+    if len(ac) != len(bc) or any(re.sub(r'\s+', '', l1) != re.sub(r'\s+', '', l2)
                                  for l1, l2 in zip(ac, bc)):
         pdns_file = '/tmp/pdns.zone'
         dim_file = '/tmp/dim.zone'

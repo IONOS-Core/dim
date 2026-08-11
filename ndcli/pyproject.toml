@@ -30,5 +30,5 @@ docs = [
 ndcli = "dimcli:main"
 
 [project.urls]
-Homepage = "https://github.com/ionos-cloud/dim"
-Issues = "https://github.com/ionos-cloud/dim/issues"
+Homepage = "https://github.com/ionos-core/dim"
+Issues = "https://github.com/ionos-core/dim/issues"
