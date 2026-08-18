@@ -425,7 +425,7 @@ class RPC(object):
                 return parents[0].layer3domain
 
         layer3domain = _get_layer3domain_arg(layer3domain, options,
-                                            guess_function=find_parent if status == 'Container' and parse_ip(block_str).prefix !=0  else None)
+                                             guess_function=find_parent if status == 'Container' else None)
         ip = check_ip(parse_ip(block_str), layer3domain, options)
         ipblock = Ipblock.query_ip(ip, layer3domain).first()
         pool = self._can_change_ip(ipblock or ip, layer3domain=layer3domain)
@@ -4186,15 +4186,14 @@ def _find_ipblock(ipblock, layer3domain, status=None):
         return block
     status_str = ' or '.join(status)
     # Try ancestors
-    if ip.prefix != 0:
-        parents = Ipblock._ancestors_noparent_query(ip, layer3domain)
-        if status:
-            parents = parents.join(IpblockStatus).filter(IpblockStatus.name.in_(status))
-        parents = parents.all()
-        if parents:
-            Messages.warn('%s rounded to %s because no ipblock exists at %s with status %s'
-                        % (ip, parents[0].ip, ip, status_str))
-            return parents[0]
+    parents = Ipblock._ancestors_noparent_query(ip, layer3domain)
+    if status:
+        parents = parents.join(IpblockStatus).filter(IpblockStatus.name.in_(status))
+    parents = parents.all()
+    if parents:
+        Messages.warn('%s rounded to %s because no ipblock exists at %s with status %s'
+                      % (ip, parents[0].ip, ip, status_str))
+        return parents[0]
     # Try descendants
     descendants = Ipblock.query.filter(inside(Ipblock.address, ip),
                                        Ipblock.version == ip.version,
