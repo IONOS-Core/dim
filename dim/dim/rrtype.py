@@ -393,3 +393,8 @@ class CAA(RRType):
     validate = {'caa_flags': validate_caa_flags,
                 'property_tag': validate_property_tag,
                 'property_value': validate_character_string}
+
+
+class ALIAS(RRType):
+    fields = ('target', )
+    validate = {'target': validate_fqdn}

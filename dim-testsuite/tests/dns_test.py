@@ -991,3 +991,109 @@ class RRReferencesTest(RPCTest):
         self.r.rr_edit(id=7, name='mx3.b.de.', references=[5])
         for view, cname in [('default', 'mx3.b.de.'), ('second', 'mx.b.de.')]:
             assert rrs(self.r.rr_list(zone='c.de', view=view, type='cname')) == rrs([('cname', 'c.de', 'CNAME', cname)])
+
+
+class ALIAS(RPCTest):
+    def setUp(self):
+        RPCTest.setUp(self)
+        self.r.zone_create('example.com')
+        self.r.zone_create('target.com')
+        self.r.rr_create(name='host.target.com.', type='A', ip='192.168.1.100')
+
+    def test_create_alias_basic(self):
+        """Test basic ALIAS record creation"""
+        self.r.rr_create(name='example.com.', type='ALIAS', target='host.target.com.')
+        assert rrs(self.r.rr_list(zone='example.com', type='ALIAS')) == rrs([
+            ('@', 'example.com', 'ALIAS', 'host.target.com.')
+        ])
+
+    def test_create_alias_subdomain(self):
+        """Test ALIAS record creation at subdomain"""
+        self.r.rr_create(name='www.example.com.', type='ALIAS', target='host.target.com.')
+        assert rrs(self.r.rr_list(zone='example.com', type='ALIAS')) == rrs([
+            ('www', 'example.com', 'ALIAS', 'host.target.com.')
+        ])
+
+    def test_alias_coexist_with_other_records(self):
+        """Test that ALIAS can coexist with other record types (unlike CNAME)"""
+        self.r.rr_create(name='example.com.', type='ALIAS', target='host.target.com.')
+        self.r.rr_create(name='example.com.', type='MX', preference=10, exchange='mail.example.com.')
+        self.r.rr_create(name='example.com.', type='TXT', strings=['v=spf1 include:_spf.example.com ~all'])
+        
+        records = self.r.rr_list(zone='example.com')
+        record_types = set(rr['type'] for rr in records if rr['type'] != 'SOA')
+        assert 'ALIAS' in record_types
+        assert 'MX' in record_types
+        assert 'TXT' in record_types
+
+    def test_alias_cname_mutual_exclusion(self):
+        """Test that ALIAS and CNAME cannot coexist"""
+        # Create CNAME first, then try ALIAS
+        self.r.rr_create(name='test1.example.com.', type='CNAME', cname='host.target.com.')
+        with raises(InvalidParameterError):
+            self.r.rr_create(name='test1.example.com.', type='ALIAS', target='host.target.com.')
+        
+        # Create ALIAS first, then try CNAME
+        self.r.rr_create(name='test2.example.com.', type='ALIAS', target='host.target.com.')
+        with raises(InvalidParameterError):
+            self.r.rr_create(name='test2.example.com.', type='CNAME', cname='host.target.com.')
+
+    def test_alias_uniqueness(self):
+        """Test that only one ALIAS record per name is allowed"""
+        self.r.rr_create(name='multi.example.com.', type='ALIAS', target='host.target.com.')
+        with raises(InvalidParameterError):
+            self.r.rr_create(name='multi.example.com.', type='ALIAS', target='other.target.com.')
+
+    def test_alias_target_validation(self):
+        """Test ALIAS target FQDN validation"""
+        with raises(InvalidParameterError):
+            self.r.rr_create(name='invalid.example.com.', type='ALIAS', target='invalid-target')
+        
+        # Valid FQDN should work
+        self.r.rr_create(name='valid.example.com.', type='ALIAS', target='valid.target.com.')
+
+    def test_alias_dnssec_prevention(self):
+        """Test that ALIAS records cannot be created in DNSSEC-enabled zones"""
+        # Enable DNSSEC on a zone
+        self.r.zone_create('dnssec-test.com')
+        self.r.zone_dnssec_enable('dnssec-test.com', algorithm=8, ksk_bits=2048, zsk_bits=1024)
+        
+        # Try to create ALIAS record in DNSSEC zone
+        with raises(InvalidParameterError):
+            self.r.rr_create(name='dnssec-test.com.', type='ALIAS', target='host.target.com.')
+
+    def test_dnssec_prevention_with_alias(self):
+        """Test that DNSSEC cannot be enabled on zones with ALIAS records"""
+        # Create zone with ALIAS record
+        self.r.zone_create('alias-zone.com')
+        self.r.rr_create(name='alias-zone.com.', type='ALIAS', target='host.target.com.')
+        
+        # Try to enable DNSSEC
+        with raises(InvalidParameterError):
+            self.r.zone_dnssec_enable('alias-zone.com', algorithm=8, ksk_bits=2048, zsk_bits=1024)
+
+    def test_alias_delete(self):
+        """Test ALIAS record deletion"""
+        self.r.rr_create(name='delete-test.example.com.', type='ALIAS', target='host.target.com.')
+        
+        # Verify record exists
+        assert len(rrs(self.r.rr_list('delete-test.example.com.'))) == 1
+        
+        # Delete and verify
+        self.r.rr_delete(name='delete-test.example.com.', type='ALIAS', target='host.target.com.')
+        assert len(rrs(self.r.rr_list('delete-test.example.com.'))) == 0
+
+    def test_alias_apex_zone(self):
+        """Test ALIAS record at zone apex (main use case)"""
+        self.r.rr_create(name='example.com.', type='ALIAS', target='host.target.com.')
+        
+        # Should be able to have other records at apex
+        self.r.rr_create(name='example.com.', type='NS', nsdname='ns1.example.com.')
+        self.r.rr_create(name='example.com.', type='MX', preference=10, exchange='mail.example.com.')
+        
+        records = self.r.rr_list(zone='example.com')
+        record_types = set(rr['type'] for rr in records
+                           if rr['record'] == '@' and rr['type'] != 'SOA')
+        assert 'ALIAS' in record_types
+        assert 'NS' in record_types
+        assert 'MX' in record_types

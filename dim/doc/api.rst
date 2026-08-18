@@ -111,7 +111,7 @@ When creating or specifying a RR, the following options are available:
 
 - *name* (string): the fqdn of the RR or the relative name if *zone* was
   specified; it can be omitted if *type* is PTR and the *ip* is specified
-- *type* (string): one of the supported RR types (A, AAAA, PTR, CNAME, DNAME, MX, NS,
+- *type* (string): one of the supported RR types (A, AAAA, PTR, CNAME, ALIAS, DNAME, MX, NS,
   SRV, TXT, SPF, RP, CERT, HINFO, NAPTR)
 - :ref:`layer3domain_option`. The layer3domain value is optional when specifying a RR
   if there is only one RR with that name, type and value.
@@ -122,6 +122,7 @@ specified differently for each type:
 - A/AAAA: *ip*
 - PTR: *ptrdname*
 - CNAME: *cname*
+- ALIAS: *target*
 - DNAME: *target*
 - MX: *preference*, *exchange*
 - NS: *nsdname*
@@ -135,6 +136,47 @@ specified differently for each type:
 
 The RR value is optional when specifying a RR if there are no other RRs with
 that name and type.
+
+
+ALIAS Records
+~~~~~~~~~~~~~
+
+ALIAS records provide CNAME-like functionality but can coexist with other record types at the same name, making them particularly useful at zone apex where CNAME records are prohibited by DNS standards.
+
+**Key Characteristics:**
+
+- Can be created at zone apex (unlike CNAME records)
+- Can coexist with other record types (MX, TXT, NS, etc.)  
+- Cannot coexist with CNAME records (mutual exclusion)
+- Only one ALIAS record allowed per name
+- Target must be a fully qualified domain name (FQDN)
+
+**DNSSEC Compatibility:**
+
+ALIAS records are incompatible with DNSSEC for security reasons as specified in draft-ietf-dnsop-aname-04:
+
+- ALIAS records cannot be created in DNSSEC-enabled zones
+- DNSSEC cannot be enabled on zones containing ALIAS records
+- Both restrictions are enforced by the API and will result in errors if violated
+
+**API Usage:**
+
+Create an ALIAS record::
+
+  rr_create({'zone': 'example.com', 'name': 'www', 'type': 'ALIAS', 'target': 'cdn.provider.com.'})
+
+The ALIAS record can coexist with other records at the same name::
+
+  rr_create({'zone': 'example.com', 'name': '@', 'type': 'ALIAS', 'target': 'host.target.com.'})
+  rr_create({'zone': 'example.com', 'name': '@', 'type': 'MX', 'preference': 10, 'exchange': 'mail.example.com.'})
+
+**Error Conditions:**
+
+- Creating ALIAS with existing CNAME at same name will fail
+- Creating CNAME with existing ALIAS at same name will fail  
+- Creating multiple ALIAS records at same name will fail
+- Creating ALIAS in DNSSEC-enabled zone will fail
+- Enabling DNSSEC on zone with ALIAS records will fail
 
 
 .. _layer3domain_option:

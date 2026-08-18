@@ -4,6 +4,6 @@
 cp -r /root/dim /tmp
 cd /tmp/dim/tests
 . /opt/dim/bin/activate
-pip install nose
-nosetests --with-xunit
-cp nosetests.xml /root/dim/
+pip install pytest
+pytest --junitxml=pytest.xml
+cp pytest.xml /root/dim/

@@ -28,8 +28,6 @@ classifiers = [
 
 [project.optional-dependencies]
 docs = [
-    "nose~=1.3",
-    "nose-ignore-docstring~=0.2",
     "pytest~=7.1",
     "pytest-cov~=3.0",
     "Sphinx~=4.4",
