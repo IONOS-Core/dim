@@ -91,6 +91,42 @@ class RightsTest(DatabaseTest):
         assert self.user.group_get_access('usergroup') == []
         self.net.group_revoke_access('usergroup', 'allocate', 'pool')
 
+        # 1. Test for the attr revoke bugfix (with dot)
+        self.net.group_grant_access('usergroup', 'attr', ['audit.', 'pool'])
+        assert self.user.ippool_get_access('pool') == [{'action': 'attr.audit.', 'group': 'usergroup', 'object': 'pool'}]
+        self.net.group_revoke_access('usergroup', 'attr', ['audit.', 'pool'])
+        assert self.user.ippool_get_access('pool') == []
+
+        # 2. Test for robustness (symmetry with direct 'attr.' prefix)
+        self.net.group_grant_access('usergroup', 'attr', ['attr.audit.', 'pool'])
+        assert self.user.ippool_get_access('pool') == [{'action': 'attr.audit.', 'group': 'usergroup', 'object': 'pool'}]
+        self.net.group_revoke_access('usergroup', 'attr', ['attr.audit.', 'pool'])
+        assert self.user.ippool_get_access('pool') == []
+
+        # 3. Test for attr revoke (without dot)
+        self.net.group_grant_access('usergroup', 'attr', ['audit', 'pool'])
+        assert self.user.ippool_get_access('pool') == [{'action': 'attr.audit', 'group': 'usergroup', 'object': 'pool'}]
+        self.net.group_revoke_access('usergroup', 'attr', ['audit', 'pool'])
+        assert self.user.ippool_get_access('pool') == []
+
+        # 4. Independence test (scenario from ticket 2)
+        # Grant both rights (with and without dot)
+        self.net.group_grant_access('usergroup', 'attr', ['audit', 'pool'])
+        self.net.group_grant_access('usergroup', 'attr', ['audit.', 'pool'])
+        rights = self.user.ippool_get_access('pool')
+        assert {'action': 'attr.audit', 'group': 'usergroup', 'object': 'pool'} in rights
+        assert {'action': 'attr.audit.', 'group': 'usergroup', 'object': 'pool'} in rights
+        
+        # Delete ONLY the right without dot
+        self.net.group_revoke_access('usergroup', 'attr', ['audit', 'pool'])
+        # The right with dot MUST still be there!
+        assert self.user.ippool_get_access('pool') == [{'action': 'attr.audit.', 'group': 'usergroup', 'object': 'pool'}]
+        
+        # Delete also the right with dot
+        self.net.group_revoke_access('usergroup', 'attr', ['audit.', 'pool'])
+        assert self.user.ippool_get_access('pool') == []
+
+
     def test_group_rename(self):
         self.net.group_create('usergroup1')
         self.net.group_rename('usergroup1', 'usergroup')

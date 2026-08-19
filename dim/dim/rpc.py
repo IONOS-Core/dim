@@ -197,6 +197,12 @@ class RPC(object):
         rights = get_rights(access, object)
         for (access, object) in rights:
             object_id, object_class = get_object_id_class(access, object)
+            # Fixes revoke attr bug
+            if access == 'attr' and object:
+                if object[0].startswith('attr.'):
+                    access = object[0]
+                else:
+                    access = 'attr.' + object[0]
             ar = AccessRight.query.filter_by(access=access,
                                              object_id=object_id,
                                              object_class=object_class).first()
@@ -4122,7 +4128,10 @@ def _group_grant_access(group, access, object):
     for (access, object) in rights:
         object_id, object_class = get_object_id_class(access, object)
         if access == 'attr':
-            access = 'attr.' + object[0]
+            if object[0].startswith('attr.'):
+                access = object[0]
+            else:
+                access = 'attr.' + object[0]
         group.rights.add(AccessRight.find_or_create(access=access,
                                                     object_id=object_id,
                                                     object_class=object_class))
