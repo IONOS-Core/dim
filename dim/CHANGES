@@ -1,7 +1,12 @@
-to be released
-------
+unreleased
+----------
+
+
+5.1.0rc1
+--------
 * added ldap pseudo user sync to manage_dim (introduces is_pseudo column, LDAP_PSEUDO_USER_BASE, LDAP_BIND_DN, and LDAP_BIND_PASSWORD configurations)
 * added automated database schema mismatch verification check on application startup
+* also bumped ndcli to 5.1.0rc1
 * reject attribute names containing colons during deletion to prevent silent failure from incorrect key-value input
 * fix revoking attribute rights on pools when utilizing trailing dots or prefix strings
 * add support for ALIAS resource records (coexists with other types at zone apex, mutually exclusive with CNAME, disabled in DNSSEC-enabled zones)

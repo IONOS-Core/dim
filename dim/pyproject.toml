@@ -1,8 +1,8 @@
 [project]
 name = "dimserver"
-version = "5.0.2"
+version = "5.1.0rc1"
 maintainers = [
-  { name = "zerimond" },
+  { name = "eschweikert" },
 ]
 description = "DNS and IP management Python server"
 requires-python = ">=3.9"
