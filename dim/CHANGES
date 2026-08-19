@@ -1,3 +1,19 @@
+unreleased
+----------
+* add support for ALIAS resource records (coexists with other types at zone apex, mutually exclusive with CNAME, disabled in DNSSEC-enabled zones)
+* add support for DNAME resource records according to RFC 6672 (prevents DNAME at zone apex, prevents records under DNAME subtrees)
+* improve output update performance by using bulk inserts instead of ORM for zone fan-out
+* allow networkadmins to create reverse zones for overlapping subnets
+* add subcommand `add-user` to manage_dim to add users from LDAP
+* add delete user command and clean up user-groups subcommand to manage_dim
+* add support for creating and listing containers of /0 size
+* add check while inserting CAA records to ensure only lower-case values are stored
+* remove unmaintained DIM web frontend
+* migrate dev dependencies and test runner from nose to pytest
+* replace deprecated pkg_resources with importlib
+* fix regular expression syntax compatibility for Python 3.13
+* fix TXT records import bug when importing a zone
+
 5.0.2
 -----
 * add new permission to set attributes on pools (#242)
