@@ -1,5 +1,6 @@
 unreleased
 ----------
+* fix revoking attribute rights on pools when utilizing trailing dots or prefix strings
 * add support for ALIAS resource records (coexists with other types at zone apex, mutually exclusive with CNAME, disabled in DNSSEC-enabled zones)
 * add support for DNAME resource records according to RFC 6672 (prevents DNAME at zone apex, prevents records under DNAME subtrees)
 * improve output update performance by using bulk inserts instead of ORM for zone fan-out
