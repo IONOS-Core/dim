@@ -110,6 +110,10 @@ class PoolTest(RPCTest):
         self.r.ippool_delete_attrs('pool_attrs', ['team'])
         assert 'team' not in self.r.ippool_get_attrs('pool_attrs')
 
+        # Test that deleting an attribute with a colon raises an exception
+        with raises(Exception):
+            self.r.ippool_delete_attrs('pool_attrs', ['team:value'])
+
         assert self.r.ippool_get_attrs('control')['team'] == '1'
         assert 'country' not in self.r.ippool_get_attrs('control')
 
