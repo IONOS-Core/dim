@@ -81,6 +81,9 @@ class WithAttr(object):
         from .history import record_history
         if not attribute_names:
             return
+        for name in attribute_names:
+            if ':' in name:
+                raise Exception("Attribute name '%s' contains ':'. Did you mean to specify only the attribute name?" % name)
         current = self.AttrClass.query\
             .filter_by(**{self.attr_backref: self})\
             .join(self.AttrNameClass)\
