@@ -26,8 +26,19 @@ class LDAP(object):
                 tls_kwargs['validate'] = ssl.CERT_REQUIRED
             server_kwargs['tls'] = ldap3.Tls(**tls_kwargs)
 
+        # Add Bind support for ldap_sync
+        bind_dn = app.config.get("LDAP_BIND_DN")
+        bind_password = app.config.get("LDAP_BIND_PASSWORD")
+        connection_kwargs = {}
+        connection_kwargs["client_strategy"] = ldap3.SAFE_SYNC
+        if bind_dn and bind_password:
+            connection_kwargs["user"] = bind_dn
+            connection_kwargs["password"] = bind_password
+        else:
+            connection_kwargs["read_only"] = True
+
         ldap_server = ldap3.Server(app.config['LDAP_SERVER'], **server_kwargs)
-        conn = ldap3.Connection(ldap_server, read_only=True, client_strategy=ldap3.SAFE_SYNC)
+        conn = ldap3.Connection(ldap_server, **connection_kwargs)
         try:
             (status, result, response, request) = conn.bind()
         except ldap3.core.exceptions.LDAPExceptionError as e:
