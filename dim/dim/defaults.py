@@ -21,6 +21,9 @@ LDAP_DEPARTMENT_BASE = ""
 LDAP_OPT_TIMEOUT = 60
 LDAP_OPT_TIMELIMIT = 60
 LDAP_OPT_NETWORK_TIMEOUT = 60
+# If let empty ldap_sync will try to sync unathenticated
+LDAP_BIND_DN = ""
+LDAP_BIND_PASSWORD = ""
 # thresholds for deletions during sync, to help catch configuration/ldap issues
 LDAP_SYNC_DELETION_THRESHOLD_USERS = -1
 LDAP_SYNC_DELETION_THRESHOLD_DEPARTMENTS = -1

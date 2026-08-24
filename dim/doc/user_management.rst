@@ -33,3 +33,6 @@ If configured, ``sync_ldap`` will query both ``LDAP_USER_BASE`` (for standard ac
 
 If ``LDAP_PSEUDO_USER_BASE`` is left empty or matches the standard base, all users will be treated as standard users.
 
+If your LDAP server requires authentication for queries (or blocks anonymous queries on certain subtrees), you can configure ``LDAP_BIND_DN`` and ``LDAP_BIND_PASSWORD`` in your ``dim.cfg``. If set, the synchronization script will use these credentials to authenticate globally before performing any searches (for standard users, pseudo-users, and departments).
+
+
