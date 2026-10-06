@@ -33,6 +33,9 @@ Source2:        %{name}.service
 Source3:        %{name}.sysconfig
 
 BuildRequires:  java-21-openjdk-devel
+# copy-jdk-configs (pulled in by the jdk) needs "lua", which compat-lua
+# provides as well; OBS does not pick one on its own
+BuildRequires:  lua
 BuildRequires:  unzip
 BuildRequires:  systemd-rpm-macros
 BuildArch:      noarch
