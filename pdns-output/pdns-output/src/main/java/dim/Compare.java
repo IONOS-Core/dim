@@ -7,6 +7,7 @@ import org.jooq.exception.DataAccessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xbill.DNS.*;
+import org.xbill.DNS.Record;
 
 import java.io.BufferedReader;
 import java.io.FileReader;

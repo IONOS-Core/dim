@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.bridge.SLF4JBridgeHandler;
 import org.xbill.DNS.*;
+import org.xbill.DNS.Record;
 import org.xbill.DNS.utils.base32;
 
 import java.io.IOException;

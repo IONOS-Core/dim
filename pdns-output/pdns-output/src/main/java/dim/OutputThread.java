@@ -153,7 +153,7 @@ class OutputThread implements Runnable {
             if (url.getScheme() == null || !url.getScheme().equals("mysql"))
                 throw new RuntimeException("Invalid scheme in db_uri for output " + name + "(" + dbUri + ")");
             else
-                pdnsdb.setDataSourceClassName("com.mysql.jdbc.jdbc2.optional.MysqlDataSource");
+                pdnsdb.setDataSourceClassName("com.mysql.cj.jdbc.MysqlDataSource");
             pdnsdb.addDataSourceProperty("serverName", url.getHost());
             if (url.getPort() != -1)
                 pdnsdb.addDataSourceProperty("port", url.getPort());

@@ -1,5 +1,5 @@
 buildscript {
-    repositories { jcenter() }
+    repositories { mavenCentral() }
 }
 
 plugins {
@@ -16,10 +16,11 @@ repositories {
 }
 
 dependencies {
-    implementation group: 'net.java.dev.jna', name: 'jna', version: '4.0.0'
-    implementation group: 'org.bouncycastle', name: 'bcprov-jdk15on', version: '1.56'
+    implementation group: 'net.java.dev.jna', name: 'jna', version: '5.17.0'
+    implementation group: 'org.bouncycastle', name: 'bcprov-jdk18on', version: '1.80'
+    implementation group: 'org.bouncycastle', name: 'bcutil-jdk18on', version: '1.80'
 
-    testImplementation 'junit:junit:4.12'
+    testImplementation 'junit:junit:4.13.2'
 }
 
 publishing {

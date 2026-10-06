@@ -180,7 +180,7 @@ public class PdnsOutput {
     public static HikariConfig dimDbConfig(Properties config) {
         HikariConfig dimdb = new HikariConfig();
         dimdb.setPoolName("dimdb");
-        dimdb.setDataSourceClassName("com.mysql.jdbc.jdbc2.optional.MysqlDataSource");
+        dimdb.setDataSourceClassName("com.mysql.cj.jdbc.MysqlDataSource");
         dimdb.setAutoCommit(false);
         dimdb.addDataSourceProperty("serverTimezone", "UTC");
         for (Map.Entry<Object, Object> entry : config.entrySet()) {

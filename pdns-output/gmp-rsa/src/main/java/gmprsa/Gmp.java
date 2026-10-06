@@ -187,7 +187,7 @@ public final class Gmp {
   /** A fixed, shared, reusable memory buffer. */
   private final Memory sharedMem = new Memory(SHARED_MEM_SIZE) {
     /** Must explicitly destroy the gmp_t structs before freeing the underlying memory. */
-    @Override protected void finalize() {
+    @Override protected void finalize() throws Throwable {
       for (mpz_t sharedOperand : sharedOperands) {
         if (sharedOperand != null) {
           __gmpz_clear(sharedOperand);

@@ -34,6 +34,7 @@ import java.util.ListIterator;
 import java.util.logging.Logger;
 
 import org.xbill.DNS.*;
+import org.xbill.DNS.Record;
 import org.xbill.DNS.utils.hexdump;
 
 /**

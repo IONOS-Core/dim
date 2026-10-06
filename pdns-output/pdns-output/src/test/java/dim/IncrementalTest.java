@@ -8,6 +8,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.xbill.DNS.*;
+import org.xbill.DNS.Record;
 
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;

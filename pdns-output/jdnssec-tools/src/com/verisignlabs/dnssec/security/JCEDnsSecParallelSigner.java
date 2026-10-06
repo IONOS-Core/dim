@@ -16,6 +16,7 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import org.xbill.DNS.*;
+import org.xbill.DNS.Record;
 import org.xbill.DNS.utils.hexdump;
 
 /**
