@@ -5,6 +5,60 @@ ndcli, dimclient, dim itself, the output and some more.
 
 **DO NOT USE THE TEST SUITE ON YOUR PRODUCTION DATA!**
 
+## running in containers
+
+`compose.yaml` brings up the whole environment (mariadb, two pdns instances, a
+freshly built `pdns-output` jar and a virtualenv with `dim`, `dimclient` and
+`ndcli`) and runs both suites:
+
+```shell
+docker compose up --build --abort-on-container-exit --exit-code-from testsuite
+```
+
+The `testsuite` service takes one argument selecting what to run: `all`
+(default, pytest suite followed by the ndcli suite), `pytest`, `ndcli`,
+`dnssec` (every dnssec related test, plus signing zones and validating them
+with drill and jdnssec-verifyzone), `dnssec-diff` (see below) or `shell` for an
+interactive prompt:
+
+```shell
+docker compose run --rm testsuite pytest
+docker compose run --rm testsuite shell
+```
+
+The `TESTS` and `PYTESTS` variables described below work here too:
+
+```shell
+docker compose run --rm -e TESTS="zone-show-1.t" testsuite ndcli
+docker compose run --rm -e PYTESTS="AllocatorTest" testsuite pytest
+```
+
+The suite hardcodes `127.0.0.1:3307` for mariadb and `127.1.1.1` / `127.2.2.2`
+for the two pdns instances, so every service shares mariadb's network
+namespace. mariadb's datadir is a tmpfs, so each `docker compose up` starts
+from an empty database.
+
+The container copies the checkout in at build time; rerun with `--build` after
+changing `dim/`, `ndcli/`, `dimclient/`, `dim-testsuite/` or `pdns-output/`.
+
+### comparing pdns-output against a previous build
+
+`dnssec-diff` runs a baseline `pdns-output` jar (on java 8) and the jar built
+from the checkout (on java 21) over the same dim database and diffs the
+resulting pdns databases. Keys and validity windows come from one fixture and
+RSASHA256 signatures are deterministic, so an unchanged behaviour gives
+identical records, RRSIGs included. Each jar runs per JVM timezone (`TZS`,
+default `UTC Europe/Berlin`) and with and without `useNativeCrypto` (`CRYPTOS`).
+Put the baseline jar into `baseline/pdns-output-old.jar`:
+
+```shell
+docker compose run --rm -v ./baseline:/opt/baseline:ro -v ./out:/out testsuite dnssec-diff
+```
+
+Dumps, diffs and logs end up in `out/dnssec-diff/`.
+
+## running on a local machine
+
 As of now, make sure that your home *does not* contain a vaild `.ndclirc` and `.ndcli.cookie`.
 If ndcli finds valid login information these might get use. In consequence the tests will be
 run on the production DIM.

@@ -9,3 +9,4 @@ dim-testsuite/dim.cfg
 dim/dist
 dimclient/dist
 ndcli/dist
+dim-testsuite/baseline
