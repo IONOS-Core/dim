@@ -39,7 +39,7 @@ public class GmpInteger extends BigInteger {
       LibGmp.__gmpz_init(peer);
     }
 
-    @Override protected void finalize() {
+    @Override protected void finalize() throws Throwable {
       LibGmp.__gmpz_clear(peer);
       super.finalize();
     }

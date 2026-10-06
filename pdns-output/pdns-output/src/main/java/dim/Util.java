@@ -13,15 +13,13 @@ import static org.jooq.impl.DSL.using;
 
 public class Util {
     static void transaction(DataSource dataSource, Consumer<DSLContext> c) {
-        try (DSLContext dsl = using(dataSource, SQLDialect.MYSQL)) {
-            dsl.transaction(cfg -> c.accept(using(cfg)));
-        }
+        DSLContext dsl = using(dataSource, SQLDialect.MYSQL);
+        dsl.transaction(cfg -> c.accept(using(cfg)));
     }
 
     static <T> T transactionCall(DataSource dataSource, Function<DSLContext, T> c) {
-        try (DSLContext dsl = using(dataSource, SQLDialect.MYSQL)) {
-            return dsl.transactionResult(cfg -> c.apply(using(cfg)));
-        }
+        DSLContext dsl = using(dataSource, SQLDialect.MYSQL);
+        return dsl.transactionResult(cfg -> c.apply(using(cfg)));
     }
 
     static Name name(String s) {

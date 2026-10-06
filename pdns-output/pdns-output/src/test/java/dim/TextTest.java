@@ -46,7 +46,7 @@ public class TextTest {
     @Parameterized.Parameters(name = "{0}")
     public static String[] data() {
         ArrayList<String> files = new ArrayList<>();
-        File folder = new File(String.class.getResource("/text").getPath());
+        File folder = new File(TextTest.class.getResource("/text").getPath());
         for (final File fileEntry : folder.listFiles()) {
             files.add(fileEntry.getName());
         }
@@ -137,7 +137,7 @@ public class TextTest {
 
     private ArrayList<RecordOp> readFile(String filename) throws Exception {
         ArrayList<RecordOp> l = new ArrayList<>();
-        BufferedReader br = new BufferedReader(new InputStreamReader(String.class.getResourceAsStream(filename)));
+        BufferedReader br = new BufferedReader(new InputStreamReader(TextTest.class.getResourceAsStream(filename)));
         String line;
         while ((line = br.readLine()) != null) {
             // Ignore comments and empty lines

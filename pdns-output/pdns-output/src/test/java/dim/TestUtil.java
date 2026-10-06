@@ -5,6 +5,7 @@ import com.verisignlabs.dnssec.security.RecordComparator;
 import com.verisignlabs.dnssec.security.ZoneVerifier;
 import org.apache.commons.io.IOUtils;
 import org.xbill.DNS.*;
+import org.xbill.DNS.Record;
 
 import java.io.*;
 import java.net.InetAddress;
@@ -47,10 +48,10 @@ public class TestUtil {
     private static DnsKeyPair loadKeyPair(String resourceName) throws IOException {
         DnsKeyPair kp = new DnsKeyPair();
 
-        DNSKEYRecord kr = loadPublicKeyFile(String.class.getResource(resourceName + ".key"));
+        DNSKEYRecord kr = loadPublicKeyFile(TestUtil.class.getResource(resourceName + ".key"));
         kp.setDNSKEYRecord(kr);
 
-        String pk = IOUtils.toString(String.class.getResource(resourceName + ".private"), Charset.defaultCharset());
+        String pk = IOUtils.toString(TestUtil.class.getResource(resourceName + ".private"), Charset.defaultCharset());
         kp.setPrivateKeyString(pk);
 
         return kp;
@@ -81,7 +82,7 @@ public class TestUtil {
 
     public static ArrayList<Record> readFile(String filename) throws Exception {
         ArrayList<Record> records = new ArrayList<>();
-        Master m = new Master(String.class.getResourceAsStream(filename));
+        Master m = new Master(TestUtil.class.getResourceAsStream(filename));
         Record r;
         while ((r = m.nextRecord()) != null) {
             records.add(r);

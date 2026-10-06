@@ -30,6 +30,7 @@
 package com.verisignlabs.dnssec.security;
 
 import org.xbill.DNS.*;
+import org.xbill.DNS.Record;
 import org.xbill.DNS.utils.base16;
 import org.xbill.DNS.utils.base32;
 

@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM gradle:jdk8-jammy as builder
+FROM gradle:jdk21-jammy as builder
 
 WORKDIR /build
 
@@ -21,7 +21,7 @@ RUN cd ./pdns-output \
     && ../gradlew shadowJar -x test
 
 
-FROM java:openjdk-8u111-jre AS final
+FROM eclipse-temurin:21-jre AS final
 
 ARG UID=10001
 RUN adduser \
@@ -39,8 +39,8 @@ COPY --chown=pdns-output:pdns-output ./pdns-output/src/main/resources/* /etc/dim
 
 USER pdns-output
 
-ARG VERSION=4.0.0
+ARG VERSION=5.0.3
 
 COPY --from=builder /build/pdns-output/build/libs/pdns-output-${VERSION}-all.jar /opt/pdns-output.jar
 
-ENTRYPOINT [ "/usr/bin/java", "-jar", "/opt/pdns-output.jar" ]
+ENTRYPOINT [ "java", "-jar", "/opt/pdns-output.jar" ]

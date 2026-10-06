@@ -1,6 +1,7 @@
 package dim;
 
 import org.xbill.DNS.*;
+import org.xbill.DNS.Record;
 
 import java.io.IOException;
 import java.util.*;
