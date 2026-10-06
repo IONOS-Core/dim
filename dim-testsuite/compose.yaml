@@ -1,0 +1,61 @@
+name: dim-testsuite
+
+# The test suite hardcodes 127.0.0.1:3307 for mariadb and 127.1.1.1 / 127.2.2.2
+# for the two pdns instances, so every service shares mariadb's network
+# namespace.
+services:
+  mariadb:
+    image: mariadb:10.6.27
+    command: --port=3307 --max-allowed-packet=64M --skip-name-resolve
+    environment:
+      MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "yes"
+    volumes:
+      - ./docker/mariadb-init.sh:/docker-entrypoint-initdb.d/10-dim.sh:ro
+      - ./testenv/pdns.sql:/pdns.sql:ro
+    # every run starts from an empty database
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      # only true once the init scripts ran and the real server listens on tcp
+      test: ["CMD", "mysql", "-h127.0.0.1", "-P3307", "-uroot", "-e", "select count(*) from domains", "pdns1"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+      start_period: 60s
+
+  pdns1:
+    image: powerdns/pdns-auth-50:5.0.3
+    network_mode: "service:mariadb"
+    volumes:
+      - ./docker/pdns1.conf:/etc/powerdns/pdns.conf:ro
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+  pdns2:
+    image: powerdns/pdns-auth-50:5.0.3
+    network_mode: "service:mariadb"
+    volumes:
+      - ./docker/pdns2.conf:/etc/powerdns/pdns.conf:ro
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+  testsuite:
+    build:
+      context: ..
+      dockerfile: dim-testsuite/Dockerfile
+    network_mode: "service:mariadb"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      pdns1:
+        condition: service_started
+      pdns2:
+        condition: service_started
+    environment:
+      # subset of the tests in t/ to run, empty means all of them
+      TESTS: "${TESTS:-}"
+      # -k expression for the pytest suite, empty means all of them
+      PYTESTS: "${PYTESTS:-}"
+    command: ["all"]

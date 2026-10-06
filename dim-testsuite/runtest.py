@@ -91,8 +91,8 @@ class PDNSOutputProcess(object):
         if self.needed:
             while True:
                 out = Popen(DIM_MYSQL_COMMAND, shell=True, stdin=PIPE, stdout=PIPE)\
-                      .communicate(input='SELECT COUNT(*) FROM outputupdate')[0]
-                if int(out.split()[1]) == 0:
+                      .communicate(input=b'SELECT COUNT(*) FROM outputupdate')[0]
+                if int(out.split()[1].decode('utf-8')) == 0:
                     break
                 else:
                     os.read(self.proc.stdout.fileno(), 1024)
@@ -142,7 +142,17 @@ def clean_database():
 
 def run_command(line: bytes, cmd_input=None):
     cmd = shlex.split(line[7:].decode('utf-8'))
+    # ndcli commands are not run through a shell, so handle "> file" ourselves
+    redirect = None
+    if '>' in cmd:
+        pos = cmd.index('>')
+        redirect = cmd[pos + 1]
+        cmd = cmd[:pos]
     out = _ndcli(cmd, cmd_input)
+    if redirect is not None:
+        with open(redirect, 'wb') as f:
+            f.write(out)
+        return b''
     return out
 
 
@@ -161,11 +171,11 @@ def process_command(actual_output, expected_output, out, sort_before=False):
     if sort_before:
         actual_output.sort()
         expected_output.sort()
-    for actual, expected in zip_longest(actual_output, expected_output, fillvalue=''):
-        expected = expected.strip('\n')
-        if expected.endswith(' re'):
+    for actual, expected in zip_longest(actual_output, expected_output, fillvalue=b''):
+        expected = expected.strip(b'\n')
+        if expected.endswith(b' re'):
             if re.match(expected[:-3], actual):
-                out.write(expected + '\n')
+                out.write(expected + b'\n')
             else:
                 out.write(actual + b'\n')
                 passed = False

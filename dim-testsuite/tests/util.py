@@ -12,10 +12,8 @@ def raises(error, message=None):
     try:
         yield
     except error as e:
-        if message is not None:
-            err_msg = str(e)
-            if message not in err_msg:
-                raise AssertionError("Expected exception message containing '%s' but got '%s'" % (message, err_msg))
+        if message is not None and message not in str(e):
+            raise AssertionError("Expected %s containing %r but got %r" % (error.__name__, message, str(e)))
     except Exception as e:
         logging.exception(e)
         raise AssertionError("Expected exception %s but got %s" % (error.__name__, e.__class__.__name__))

@@ -1,0 +1,25 @@
+# Applies to builds using the repository root as context (dim-testsuite,
+# ndcli). Keeps local build artifacts out of the image, so that containers
+# always build from the sources in the checkout.
+
+**/.git
+**/.gitignore
+**/.DS_Store
+**/.idea
+**/.vscode
+**/__pycache__
+**/*.pyc
+**/.venv
+**/.pytest_cache
+
+# gradle / java
+**/build
+**/.gradle
+
+# dim-testsuite
+dim-testsuite/virtual_env
+dim-testsuite/out
+dim-testsuite/log
+
+# baseline jar for docker/dnssec-diff.sh, mounted at run time
+dim-testsuite/baseline
