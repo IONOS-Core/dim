@@ -110,7 +110,7 @@ def is_reverse_zone(zone):
 
 
 def generate_salt():
-    return binascii.hexlify(os.urandom(8))
+    return binascii.hexlify(os.urandom(8)).decode("ascii")
 
 
 def completion_callback(func):
