@@ -1,0 +1,18 @@
+[Unit]
+Description=DIM PDNS Output Service
+Documentation=https://github.com/ionos-cloud/dim
+After=network.target
+
+[Service]
+Type=simple
+User=pdns-output
+Group=pdns-output
+EnvironmentFile=-/etc/sysconfig/pdns-output
+ExecStart=/usr/sbin/pdns-output
+Restart=on-failure
+RestartSec=10s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
