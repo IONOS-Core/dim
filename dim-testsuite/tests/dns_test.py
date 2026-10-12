@@ -403,6 +403,16 @@ class RR(RPCTest):
         with raises(InvalidParameterError):
             self.r.rr_create(name='d.test.com.', type='MX', preference=10, exchange='a.test.com.')
 
+    def test_rr_list_exact(self):
+        self.r.zone_create('test.com')
+        self.r.rr_create(name='*.test.com.', type='A', ip='12.0.0.1')
+        self.r.rr_create(name='a.test.com.', type='A', ip='12.0.0.2')
+        wildcard = rrs(self.r.rr_list(pattern='*.test.com.'))
+        assert ('*', 'test.com', 'A', '12.0.0.1') in wildcard
+        assert ('a', 'test.com', 'A', '12.0.0.2') in wildcard
+        assert rrs(self.r.rr_list(pattern='*.test.com.', exact=True)) == rrs([
+            ('*', 'test.com', 'A', '12.0.0.1')])
+
     def test_create_cname_2(self):
         # ND-100
         self.r.zone_create('test.com')

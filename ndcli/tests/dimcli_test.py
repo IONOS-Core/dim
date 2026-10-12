@@ -228,6 +228,18 @@ def test_create_rr_cname():
     assert ndcli('delete zone test.com --cleanup').ok
 
 
+def test_list_rrs_exact():
+    assert ndcli('create zone test.com').ok
+    assert ndcli('create rr *.test.com. a 12.0.0.1').ok
+    assert ndcli('create rr a.test.com. a 12.0.0.2').ok
+    wildcard = nosoa(ndcli('list rrs *.test.com. -H').table)
+    assert ['*', 'test.com', 'default', '', 'A', '12.0.0.1'] in wildcard
+    assert ['a', 'test.com', 'default', '', 'A', '12.0.0.2'] in wildcard
+    assert nosoa(ndcli('list rrs *.test.com. --exact -H').table) == [
+        ['*', 'test.com', 'default', '', 'A', '12.0.0.1']]
+    assert ndcli('delete zone test.com --cleanup').ok
+
+
 def test_show_rr():
     # ND-92
     assert ndcli('create zone test.com').ok
