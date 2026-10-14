@@ -139,6 +139,17 @@ def transaction_delayed_lock(f):
     return retryable_transaction(_transaction_delayed_lock(f))
 
 
+def _ignore_dryrun(f):
+    '''A read-only call has nothing to roll back, so dryrun does not apply to it.
+
+    ndcli -n sends dryrun with every call, read-only ones included.'''
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        kwargs.pop('dryrun', None)
+        return f(*args, **kwargs)
+    return wrapper
+
+
 class TransactionProxy(object):
     def __init__(self, obj):
         self.obj = obj
@@ -148,7 +159,7 @@ class TransactionProxy(object):
             func = getattr(self.obj, name)
             if callable(func):
                 if getattr(func, 'readonly', False):
-                    return user_session(self.obj.username, self.obj.tool, self.obj.ip)(time_function(func))
+                    return user_session(self.obj.username, self.obj.tool, self.obj.ip)(time_function(_ignore_dryrun(func)))
                 elif getattr(func, 'delayed_lock', False):
                     return user_session(self.obj.username, self.obj.tool, self.obj.ip)(
                         time_function(transaction_delayed_lock(func)))
