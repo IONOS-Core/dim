@@ -3421,6 +3421,8 @@ class RPC(object):
         if 'type' in kwargs:
             self._check_rr_parameters(kwargs, creating=False)
             self._parse_ip_from_rr_parameters(kwargs, zone=None, creating=False)
+            # layer3domain was only needed to find the ipblock, it is not part of the rr value
+            kwargs.pop('layer3domain', None)
             if kwargs['type'] == 'PTR' and 'ip' in kwargs:
                 kwargs['name'] = dim.dns.get_ptr_name(kwargs['ip'])
                 del kwargs['ip']

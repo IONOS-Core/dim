@@ -650,6 +650,8 @@ def _make_show_rr(rr_type, params):
         options = OptionDict()
         options.set_if(type=rr_type,
                        view=args.get('view', None))
+        if rr_type in ('A', 'AAAA', 'PTR'):
+            options.set_if(layer3domain=get_layer3domain(args.get('layer3domain', None)))
         _fill_rr_options(options, rr_type, params, args)
         _print_attributes(self.client.rr_get_attrs(**options),
                           script=False)
@@ -662,6 +664,8 @@ def _make_modify_rr(rr_type, params):
         options.set_if(type=rr_type,
                        view=args.view,
                        comment=args.comment)
+        if rr_type in ('A', 'AAAA', 'PTR'):
+            options.set_if(layer3domain=get_layer3domain(args.get('layer3domain', None)))
         if args.ttl is not None:
             if args.ttl.lower() == 'default':
                 args.ttl = None
@@ -2406,6 +2410,11 @@ delegation).''')
         delete_arguments = properties.get('delete_arguments', properties['arguments'])
         delete_rr_options = [Group(*delete_arguments, **{'nargs': '?', 'stop_at': 'view'}), rr_view_group]
         show_rr_options = [Group(*delete_arguments, **{'nargs': '?', 'stop_at': 'view'}), rr_single_view_group]
+        if rr in ('a', 'aaaa', 'ptr'):
+            # the address may exist in more than one layer3domain, like for "delete rr"
+            show_rr_options = [Group(*delete_arguments, **{'nargs': '?', 'stop_at': ['layer3domain', 'view']}),
+                               rr_single_view_group,
+                               layer3domain_group]
         cmd.register('modify zone create rr ' + rr,
                      description=create_rr_description,
                      *modify_zone_create_rr_options)\

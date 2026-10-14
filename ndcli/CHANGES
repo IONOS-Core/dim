@@ -1,5 +1,6 @@
 unreleased
 ----------
+* `show rr` and `modify rr` for A, AAAA and PTR accept `layer3domain` and use the default from NDCLI_LAYER3DOMAIN / ~/.ndclirc like `create rr` and `delete rr` (ITOUDP-8041)
 * add support for ALIAS resource records (create, delete, modify, show)
 * add support for DNAME resource records (create, delete, modify, show, and zone import)
 * add tree view and filtering rendering mode to `list containers` command (`-T`/`--tree`, `-p`/`--pattern`, `-c`/`--case-sensitive`, `--no-color`)
