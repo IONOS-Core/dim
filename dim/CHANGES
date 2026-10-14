@@ -1,5 +1,6 @@
 to be released
 ------
+* fix `create rr ... from POOL` rejecting an address that is only in use in another layer3domain (ITOUDP-8009)
 * added ldap pseudo user sync to manage_dim (introduces is_pseudo column, LDAP_PSEUDO_USER_BASE, LDAP_BIND_DN, and LDAP_BIND_PASSWORD configurations)
 * added automated database schema mismatch verification check on application startup
 * reject attribute names containing colons during deletion to prevent silent failure from incorrect key-value input

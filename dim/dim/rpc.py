@@ -2206,7 +2206,7 @@ class RPC(object):
     @updating
     def rr_create_from_pool(self, name, pool, ttl=None, comment=None, full=False, attributes=None, views=None):
         pool = get_pool(pool)
-        ipblock = self._ip_mark(allocate_ip(pool), attributes=attributes, pool=pool)
+        ipblock = self._ip_mark(allocate_ip(pool), layer3domain=pool.layer3domain, attributes=attributes, pool=pool)
         if ipblock:
             type = 'A'
             if ipblock.version == 6:
