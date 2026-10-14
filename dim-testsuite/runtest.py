@@ -161,11 +161,12 @@ def process_command(actual_output, expected_output, out, sort_before=False):
     if sort_before:
         actual_output.sort()
         expected_output.sort()
-    for actual, expected in zip_longest(actual_output, expected_output, fillvalue=''):
-        expected = expected.strip('\n')
-        if expected.endswith(' re'):
+    # output and expectation are bytes, like the rest of the file handling here
+    for actual, expected in zip_longest(actual_output, expected_output, fillvalue=b''):
+        expected = expected.strip(b'\n')
+        if expected.endswith(b' re'):
             if re.match(expected[:-3], actual):
-                out.write(expected + '\n')
+                out.write(expected + b'\n')
             else:
                 out.write(actual + b'\n')
                 passed = False
