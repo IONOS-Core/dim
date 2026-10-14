@@ -33,6 +33,7 @@ $ ndcli create container ::/0 layer3domain default
 ERROR - ::/0 already exists in layer3domain default with status Container
 
 $ ndcli list containers layer3domain default
+layer3domain: default
 0.0.0.0/0 (Container)
   0.0.0.0/0 (Available)
 ::/0 (Container)

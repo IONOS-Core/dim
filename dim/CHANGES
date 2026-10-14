@@ -1,5 +1,6 @@
 to be released
 ------
+* add ip version to the ipblock uniqueness key so 0.0.0.0/0 and ::/0 can coexist in one layer3domain (schema 13 -> 14, see sql/migrate_13_to_14.sql)
 * added ldap pseudo user sync to manage_dim (introduces is_pseudo column, LDAP_PSEUDO_USER_BASE, LDAP_BIND_DN, and LDAP_BIND_PASSWORD configurations)
 * added automated database schema mismatch verification check on application startup
 * reject attribute names containing colons during deletion to prevent silent failure from incorrect key-value input
