@@ -1,19 +1,23 @@
 package dim;
 
-import com.verisignlabs.dnssec.security.DnsKeyPair;
-import org.jooq.DSLContext;
-import org.jooq.Result;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.xbill.DNS.*;
-import org.xbill.DNS.Record;
-import org.xbill.DNS.utils.base16;
-
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import org.jooq.DSLContext;
+import org.jooq.Result;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.xbill.DNS.DClass;
+import org.xbill.DNS.DNSKEYRecord;
+import org.xbill.DNS.Name;
+import org.xbill.DNS.Record;
+import org.xbill.DNS.Type;
+import org.xbill.DNS.utils.base16;
+
+import com.verisignlabs.dnssec.security.DnsKeyPair;
 
 import static dim.Util.name;
 

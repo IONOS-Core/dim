@@ -1,25 +1,32 @@
 # syntax=docker/dockerfile:1
 
-ARG PYTHON_VERSION=3.9.2
-FROM python:${PYTHON_VERSION}-slim
+ARG PYTHON_VERSION=3.11
+ARG DEBIAN_RELEASE=trixie
 
-RUN apt update \
-    && apt install --no-install-suggests --no-install-recommends -y \
-    pkg-config gcc curl wget gnupg lsb-release python3-dev \
-    && apt-key del 'A4A9 4068 76FC BD3C 4567  70C8 8C71 8D3B 5072 E1F5' \
-    && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys B7B3B788A8D3785C \
-    && curl -sLo mysql.deb https://dev.mysql.com/get/mysql-apt-config_0.8.19-1_all.deb \
-    && DEBIAN_FRONTEND=noninteractive dpkg -i mysql.deb \
-    && rm mysql.deb \
-    && apt update \
-    && apt -y install libmysqlclient-dev \
-    && apt purge -y pkg-config curl wget gnupg lsb-release python3-dev
+# build the wheels (mysqlclient needs a compiler and the client headers)
+FROM python:${PYTHON_VERSION}-slim-${DEBIAN_RELEASE} AS build
+
+RUN apt-get update \
+    && apt-get install -y --no-install-suggests --no-install-recommends \
+        gcc pkg-config libmariadb-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN --mount=type=bind,source=requirements.txt,target=requirements.txt \
+    pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
+
+
+FROM python:${PYTHON_VERSION}-slim-${DEBIAN_RELEASE}
+
+# runtime library for mysqlclient; dim talks to MariaDB
+RUN apt-get update \
+    && apt-get install -y --no-install-suggests --no-install-recommends libmariadb3 \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-RUN --mount=type=bind,source=requirements.txt,target=requirements.txt \
-    python -m pip install -r requirements.txt
+RUN --mount=type=bind,from=build,source=/wheels,target=/wheels \
+    pip install --no-cache-dir --no-index /wheels/*.whl
 
 ARG UID=10001
 RUN adduser \
@@ -39,4 +46,4 @@ COPY --chown=dimuser:dimuser . .
 
 USER dimuser
 
-CMD gunicorn 'app:application' -w 4 -b :8000
+CMD ["gunicorn", "app:application", "-w", "4", "-b", ":8000"]
