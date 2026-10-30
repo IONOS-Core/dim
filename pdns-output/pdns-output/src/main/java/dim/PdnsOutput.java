@@ -183,6 +183,8 @@ public class PdnsOutput {
         dimdb.setDataSourceClassName("com.mysql.cj.jdbc.MysqlDataSource");
         dimdb.setAutoCommit(false);
         dimdb.addDataSourceProperty("serverTimezone", "UTC");
+        // dim writes TIMESTAMPs in a UTC session, read them back in one too instead of the server's time_zone
+        dimdb.addDataSourceProperty("forceConnectionTimeZoneToSession", "true");
         for (Map.Entry<Object, Object> entry : config.entrySet()) {
             String key = (String) entry.getKey();
             if (key.startsWith("db.")) {
