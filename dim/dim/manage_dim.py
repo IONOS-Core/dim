@@ -41,8 +41,13 @@ def update_validity():
                         (zone.valid_end is None or zone.valid_begin is None or zone.valid_end <= zone.valid_begin or
                          zone.valid_end <= datetime.datetime.utcnow() + (zone.valid_end - zone.valid_begin) / 2)):
                     zone.set_validity()
+                    # The outputs only re-sign the zone with the new window when they
+                    # get a dnssec_update. set_nsec3params() sends one; NSEC zones need
+                    # it explicitly, otherwise their signatures expire after one window.
                     if zone.nsec3_algorithm:
                         zone.set_nsec3params(1, zone.nsec3_iterations, zone.nsec3_salt)
+                    else:
+                        dim.models.OutputUpdate.send_dnssec_update(zone, '')
             except Exception as e:
                 print('Error updating the validity window for zone', zone.name)
                 raise
