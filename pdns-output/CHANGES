@@ -1,0 +1,14 @@
+5.0.3
+-----
+* upgrade build and runtime to Java 21 and Gradle 9.5.1 (#329)
+* update dependencies: mysql-connector-j 9.3, jOOQ 3.18, HikariCP 6, BouncyCastle 1.80, JNA 5, Log4j 2.26 with SLF4J 2
+* replace jcenter with Maven Central and migrate to com.gradleup.shadow plugin
+* enforce UTC session timezone in JDBC connection pool (forceConnectionTimeZoneToSession=true) to match DIM's TIMESTAMP handling
+* resolve class naming clash between org.xbill.DNS.Record and java.lang.Record
+* add OBS RPM packaging specifications for Oracle Linux 9/10 (offline build support with pre-warmed Gradle/Maven cache)
+* ensure configuration files in /etc/dim are readable by pdns-output service user
+* dim-testsuite: add containerized test execution with multi-timezone dnssec and dnssec-diff validation against PowerDNS 5.0
+
+4.0.0
+-----
+* initial pdns-output release running on Java 8
