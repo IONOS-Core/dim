@@ -43,17 +43,21 @@ changing `dim/`, `ndcli/`, `dimclient/`, `dim-testsuite/` or `pdns-output/`.
 
 ### comparing pdns-output against a previous build
 
-`dnssec-diff` runs a baseline `pdns-output` jar (on java 8) and the jar built
-from the checkout (on java 21) over the same dim database and diffs the
-resulting pdns databases. Keys and validity windows come from one fixture and
-RSASHA256 signatures are deterministic, so an unchanged behaviour gives
-identical records, RRSIGs included. Each jar runs per JVM timezone (`TZS`,
-default `UTC Europe/Berlin`) and with and without `useNativeCrypto` (`CRYPTOS`).
-Put the baseline jar into `baseline/pdns-output-old.jar`:
+`dnssec-diff` runs a previous `pdns-output` jar (the old version) and the newly built
+jar from the checkout over the same dim database and diffs the resulting PowerDNS
+databases. Keys and validity windows come from one fixture and RSASHA256
+signatures are deterministic, so an unchanged behaviour gives identical
+records, RRSIGs included. Each jar runs per JVM timezone (`TZS`, default
+`UTC Europe/Berlin`) and with and without `useNativeCrypto` (`CRYPTOS`).
+
+Put the old jar into `baseline/pdns-output-old.jar`:
 
 ```shell
 docker compose run --rm -v ./baseline:/opt/baseline:ro -v ./out:/out testsuite dnssec-diff
 ```
+
+You can customize the jars and Java runtimes via environment variables:
+`OLD_JAR`, `NEW_JAR`, `OLD_JAVA`, `NEW_JAVA`.
 
 Dumps, diffs and logs end up in `out/dnssec-diff/`.
 

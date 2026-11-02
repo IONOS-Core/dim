@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# Differential DNSSEC check: the baseline pdns-output jar (the last build before
-# the java 21 migration, run on java 8) and the jar built from this checkout
-# (run on java 21) process the very same dim database, and what they write to
-# the pdns database is diffed.
+# Differential DNSSEC check: compares a previous/old pdns-output jar against the
+# newly built jar over the very same dim database, and diffs what both write to
+# the PowerDNS databases.
 #
 # The keys and the signature validity window come from one fixture and
 # RSASHA256 signatures are deterministic, so for an unchanged behaviour every
@@ -15,6 +14,14 @@
 # Run it with:
 #   docker compose run --rm -v ./baseline:/opt/baseline:ro -v ./out:/out testsuite dnssec-diff
 #
+# Environment variables:
+#   OLD_JAR   Path to previous/reference jar (default: /opt/baseline/pdns-output-old.jar)
+#   NEW_JAR   Path to newly built jar (default: /opt/dim/pdns-output.jar)
+#   OLD_JAVA  Java binary for old jar (default: java, or /opt/java8/bin/java if comparing with 4.x)
+#   NEW_JAVA  Java binary for new jar (default: java)
+#   TZS       Timezones to test (default: UTC Europe/Berlin)
+#   CRYPTOS   Crypto options (default: false true)
+#
 set -eu
 
 cd /src/dim-testsuite
@@ -25,9 +32,19 @@ export NDCLI_USERNAME=admin
 export FLASK_APP='dim:create_app(db_mode="TEST")'
 
 OLD_JAR=${OLD_JAR:-/opt/baseline/pdns-output-old.jar}
-OLD_JAVA=${OLD_JAVA:-/opt/java8/bin/java}
 NEW_JAR=${NEW_JAR:-/opt/dim/pdns-output.jar}
+
+# JRE binaries used to execute old and new jars (default to system java)
+OLD_JAVA=${OLD_JAVA:-}
+if [ -z "$OLD_JAVA" ]; then
+    if [ -x "/opt/java8/bin/java" ] && [[ "$OLD_JAR" =~ (old|4\.) ]]; then
+        OLD_JAVA="/opt/java8/bin/java"
+    else
+        OLD_JAVA="java"
+    fi
+fi
 NEW_JAVA=${NEW_JAVA:-java}
+
 OUT=${OUT:-/out/dnssec-diff}
 TZS=${TZS:-UTC Europe/Berlin}
 CRYPTOS=${CRYPTOS:-false true}
@@ -39,7 +56,8 @@ PDNS_MYSQL=(mysql -h127.0.0.1 -P3307 -updns -ppdns pdns1)
 
 ZONES="nsec.com nsec3.com nsec3salt.com parent.com child.parent.com rollover.com plain.com"
 
-[ -f "$OLD_JAR" ] || { echo "baseline jar $OLD_JAR not found" >&2; exit 1; }
+[ -f "$OLD_JAR" ] || { echo "old jar $OLD_JAR not found" >&2; exit 1; }
+[ -f "$NEW_JAR" ] || { echo "new jar $NEW_JAR not found" >&2; exit 1; }
 rm -rf "$OUT"
 mkdir -p "$OUT"
 
@@ -188,7 +206,7 @@ verify_served_zones() {
     for z in $ZONES; do
         dig +onesoa +noall +answer axfr "$z" "@$PDNS_ADDRESS" > "$dir/$z.axfr"
         grep -q RRSIG "$dir/$z.axfr" || continue
-        if java -cp "$NEW_JAR" com.verisignlabs.dnssec.cl.VerifyZone "$dir/$z.axfr" \
+        if "$CANDIDATE_JAVA" -cp "$CANDIDATE_JAR" com.verisignlabs.dnssec.cl.VerifyZone "$dir/$z.axfr" \
                 > "$dir/$z.verify" 2>&1; then
             echo "  verified  $z"
         else
