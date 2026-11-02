@@ -1,5 +1,7 @@
 #!/bin/bash
+set -euo pipefail
 
+cd "$(dirname "$0")"
 
 cd jdnssec-dnsjava && ../gradlew build -x test && ../gradlew publishToMavenLocal; cd ..
 

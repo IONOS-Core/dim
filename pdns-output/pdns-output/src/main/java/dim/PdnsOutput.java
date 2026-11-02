@@ -183,7 +183,12 @@ public class PdnsOutput {
         dimdb.setDataSourceClassName("com.mysql.cj.jdbc.MysqlDataSource");
         dimdb.setAutoCommit(false);
         dimdb.addDataSourceProperty("serverTimezone", "UTC");
-        // dim writes TIMESTAMPs in a UTC session, read them back in one too instead of the server's time_zone
+        // CRITICAL (PROB-19038): MySQL Connector/J 8/9 defaults to reading TIMESTAMP columns
+        // (valid_begin, valid_end) in the database server's session time zone (e.g. Europe/Berlin).
+        // Without forceConnectionTimeZoneToSession=true, TIMESTAMPs are shifted into local time,
+        // which moves RRSIG inception 1-2 hours into the future, causing worldwide DNSSEC validation failures!
+        // This property forces Connector/J to run the session in UTC (matching DIM's timestamp storage).
+        // DO NOT REMOVE OR MODIFY THIS PROPERTY.
         dimdb.addDataSourceProperty("forceConnectionTimeZoneToSession", "true");
         for (Map.Entry<Object, Object> entry : config.entrySet()) {
             String key = (String) entry.getKey();

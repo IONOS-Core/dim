@@ -89,23 +89,19 @@ docker compose down -v
 
 ### comparing against a previous build
 
-`dnssec-diff` runs a previous `pdns-output` jar (on java 8) and the current one
-(on java 21) over the same dim database and diffs what both write to PowerDNS.
-With identical behaviour the records, RRSIGs included, are byte for byte the
-same. Use it before releasing changes to the signing code or its dependencies.
-The jar has to be built from the previous version, e.g. from the last release
-tag with `gradle:jdk8-jammy` and that version's `Dockerfile`:
+`dnssec-diff` runs a previous `pdns-output` jar (the old version) and the newly built
+jar over the same dim database and diffs what both write to PowerDNS. With identical
+behaviour the records, RRSIGs included, are byte for byte the same. Use it
+before releasing changes to the signing code or its dependencies.
 
 ```bash
 cd <dim-checkout>/dim-testsuite
-mkdir -p baseline && cp <old>/pdns-output-4.0.0-all.jar baseline/pdns-output-old.jar
+mkdir -p baseline && cp <old-jar> baseline/pdns-output-old.jar
 docker compose run --rm --build -v ./baseline:/opt/baseline:ro -v ./out:/out testsuite dnssec-diff
 ```
 
-Results, dumps and diffs are in `out/dnssec-diff/`. The JVM timezone matters:
-the 4.0.0 jar read the signature validity window from dim in the JVM's local
-timezone, so on a non-UTC JVM its RRSIG inception/expiration differ from the
-current jar's.
+Variables `OLD_JAR`, `NEW_JAR`, `OLD_JAVA`, `NEW_JAVA` can be passed to configure
+the jars and Java runtimes. Results, dumps and diffs are in `out/dnssec-diff/`.
 
 # Docker build
 Build your docker image by running:
@@ -127,15 +123,17 @@ docker run \
 
 # RPM package (OBS)
 
-The spec, systemd unit and sysconfig file are in [obs/](./obs). OBS builds
-without network access, so besides the source tarball the package carries a
+RPM packaging (spec, systemd unit, and sysconfig files) is maintained directly in the
+Open Build Service (`build.opensuse.org`) under project `network:dim` (package `pdns-output`),
+matching the packaging workflow of `dim` and `ndcli`.
+
+OBS builds without network access, so besides the source tarball the package carries a
 tarball with the Gradle distribution and every dependency.
 
 ## 1. Prepare the sources
 
-`Version` in `obs/pdns-output.spec` has to match `version` in
-`pdns-output/build.gradle`. Commit your changes first, the source tarball is
-made from git.
+`Version` in the OBS spec file has to match `version` in `pdns-output/build.gradle`.
+Commit your changes first, as the source tarball is generated from git.
 
 ```bash
 VERSION=5.0.3
@@ -157,8 +155,6 @@ docker run --rm -v $OUT:/out -e VERSION=$VERSION -e OWNER=$(id -u):$(id -g) grad
   rm -rf $GRADLE_USER_HOME/daemon $GRADLE_USER_HOME/.tmp
   tar -czf /out/gradle-offline-$VERSION.tar.gz -C $HOME .gradle
   chown $OWNER /out/*'
-
-cp pdns-output/obs/pdns-output.spec pdns-output/obs/pdns-output.service pdns-output/obs/pdns-output.sysconfig $OUT/
 ```
 
 The cache tarball is about 300 MB.
@@ -196,7 +192,7 @@ docker run --rm -v /tmp/obs-rpms:/rpms:ro oraclelinux:9 bash -c '
 `.osc/`), not in `obs/` of this repository:
 
 ```bash
-cd ~/ionos/ITODNS:EPEL:Staging:A      # osc checkout of the project
+cd ~/obs/build.opensuse.org/network:dim      # osc checkout of the project
 osc up
 osc mkpac pdns-output                 # first time only, if the package does not exist yet
 cd pdns-output
@@ -215,8 +211,7 @@ osc commit -m "pdns-output $VERSION"
 ```
 
 `osc results` shows the build state on the server, `osc buildlog OracleLinux_9 x86_64`
-the log. Promote from `ITODNS:EPEL:Staging:A` to `ITODNS:EPEL` only after the
-package was tested on a staging host.
+the log.
 
 ## Upgrading from the 4.x RPM
 
