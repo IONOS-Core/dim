@@ -8,6 +8,7 @@ on:
       - 'ndcli/**'
       - 'dimclient/**'
       - 'dim-testsuite/**'
+      - 'Makefile'
   push:
     paths:
       - '.github/workflows/**'
@@ -15,6 +16,7 @@ on:
       - 'ndcli/**'
       - 'dimclient/**'
       - 'dim-testsuite/**'
+      - 'Makefile'
 
 jobs:
   pytest_dim:
@@ -80,3 +82,11 @@ jobs:
       - name: Run pytests
         run: make pytest
         working-directory: dim-testsuite
+
+  testbed_e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Run E2E testbed scenario tests
+        run: make testbed-test
