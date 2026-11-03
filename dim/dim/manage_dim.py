@@ -30,16 +30,36 @@ def set_user(username, type):
         print(str(e))
 
 
-@manage_dim.cli.command('')
-def update_validity():
+@manage_dim.cli.command('update-validity')
+@click.option('-v', '--verbose', is_flag=True, help='Print details about evaluated and renewed zones')
+@click.option('-n', '--dry-run', '--noop', 'dryrun', is_flag=True, help='Do not commit changes to the database')
+def update_validity(verbose=False, dryrun=False):
     '''Check for signed zones with less than half of the validity window left and increase the validity period'''
     with current_app.test_request_context():
         g.tid = uuid.uuid4().hex[16:]
-        for zone in dim.models.Zone.query.all():
-            try:
-                if (len(zone.keys) > 0 and
-                        (zone.valid_end is None or zone.valid_begin is None or zone.valid_end <= zone.valid_begin or
-                         zone.valid_end <= datetime.datetime.utcnow() + (zone.valid_end - zone.valid_begin) / 2)):
+        now = datetime.datetime.utcnow()
+        all_zones = dim.models.Zone.query.all()
+        total_signed = 0
+        renewed_count = 0
+        skipped_count = 0
+        error_count = 0
+
+        for zone in all_zones:
+            if not zone.is_signed():
+                continue
+            total_signed += 1
+
+            half_window = datetime.timedelta(seconds=zone.get_validity_window() / 2)
+            reason = None
+            if zone.valid_end is None or zone.valid_begin is None:
+                reason = "missing timestamps"
+            elif zone.valid_end <= zone.valid_begin:
+                reason = "corrupted timestamps (valid_end <= valid_begin)"
+            elif zone.valid_end <= now + half_window:
+                reason = "remaining validity <= 50% of window"
+
+            if reason:
+                try:
                     zone.set_validity()
                     # The outputs only re-sign the zone with the new window when they
                     # get a dnssec_update. set_nsec3params() sends one; NSEC zones need
@@ -48,10 +68,55 @@ def update_validity():
                         zone.set_nsec3params(1, zone.nsec3_iterations, zone.nsec3_salt)
                     else:
                         dim.models.OutputUpdate.send_dnssec_update(zone, '')
-            except Exception as e:
-                print('Error updating the validity window for zone', zone.name)
-                raise
-        dim.models.db.session.commit()
+                    renewed_count += 1
+                    if verbose:
+                        begin_str = zone.valid_begin.strftime('%Y-%m-%d %H:%M:%SZ') if zone.valid_begin else ''
+                        end_str = zone.valid_end.strftime('%Y-%m-%d %H:%M:%SZ') if zone.valid_end else ''
+                        click.secho(
+                            f"[QUEUE] {zone.name}: {reason} -> "
+                            f"valid: {begin_str} to {end_str} "
+                            f"(queued in outputupdate)",
+                            fg="green",
+                        )
+                    else:
+                        click.secho(f"[QUEUE] {zone.name} ({reason})", fg="green")
+                except Exception as e:
+                    error_count += 1
+                    click.secho(f"[ERROR] Error updating validity for zone {zone.name}: {e}", fg="red")
+                    raise
+            else:
+                skipped_count += 1
+                if verbose:
+                    end_dt = zone.valid_end
+                    remaining = (end_dt - now).total_seconds() / 86400 if end_dt else 0.0
+                    half_days = half_window.total_seconds() / 86400
+                    end_str = end_dt.strftime('%Y-%m-%d %H:%M:%SZ') if end_dt else 'unknown'
+                    click.secho(
+                        f"[SKIP]  {zone.name}: remaining {remaining:.1f}d > {half_days:.1f}d "
+                        f"(valid until {end_str})",
+                        fg="white",
+                    )
+
+        if dryrun:
+            dim.models.db.session.rollback()
+            click.secho("\nDry-run: changes not committed to database and no updates queued.", fg="yellow")
+        else:
+            dim.models.db.session.commit()
+
+        # Summary output
+        unsigned_count = len(all_zones) - total_signed
+        click.echo(
+            f"\nSummary: Evaluated {total_signed} signed zones ({unsigned_count} unsigned skipped):\n"
+            f"  - Queued for pdns-output: {renewed_count}\n"
+            f"  - Up-to-date (skipped):   {skipped_count}\n"
+            f"  - Errors:                 {error_count}"
+        )
+        if renewed_count > 0 and not dryrun:
+            click.secho(
+                "Notice: Validity renewed in DIM database and queued in outputupdate table. "
+                "pdns-output daemon will sign and publish records to PowerDNS asynchronously.",
+                fg="cyan",
+            )
 
 
 @manage_dim.cli.command('ldap_add_user')

@@ -1,5 +1,7 @@
 to be released
 ------
+* backdate DNSSEC signature inception by 1 hour (RFC 6781) and introduce configurable dnssec_validity_skew zone attribute
+* add --verbose and --dry-run options to manage_dim update-validity and improve queue status output
 * fix update-validity not publishing the renewed signature validity of NSEC (non-NSEC3) zones to the outputs, which let their RRSIGs expire
 * added ldap pseudo user sync to manage_dim (introduces is_pseudo column, LDAP_PSEUDO_USER_BASE, LDAP_BIND_DN, and LDAP_BIND_PASSWORD configurations)
 * added automated database schema mismatch verification check on application startup

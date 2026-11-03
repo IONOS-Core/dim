@@ -136,7 +136,10 @@ zone is present in any ``pdns-db`` output.
 
 ``manage_dim update_validity`` needs to run periodically in order to ensure that the validity window stays up-to-date.
 The validity window can be configured per zone by setting the ``dnssec_validity_window`` attribute (validity window
-in seconds).
+in seconds, minimum 4 days, default 14 days).
+In accordance with RFC 6781, signature inception is backdated to compensate for clock drift between signing systems
+and caching resolvers. The inception skew offset can be customized per zone via the ``dnssec_validity_skew`` attribute
+(in seconds, minimum 0, default 3600 seconds / 1 hour).
 
 .. _autodns3:
 
