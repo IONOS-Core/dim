@@ -40,13 +40,21 @@ class UpdateValidityTest(RPCTest):
         assert result.exit_code == 0, result.output
         db.session.expire_all()
 
+    def valid_begin(self, name):
+        return Zone.query.filter_by(name=name).one().valid_begin
+
     def valid_end(self, name):
         return Zone.query.filter_by(name=name).one().valid_end
 
     def assert_renewed_and_published(self, name):
         before = self.dnssec_updates(name)
+        now = datetime.datetime.utcnow()
         self.run_update_validity()
-        assert self.valid_end(name) > datetime.datetime.utcnow() + datetime.timedelta(days=13)
+        # Verify valid_begin is backdated by 1 hour (RFC 6781 skew)
+        assert now - datetime.timedelta(seconds=3660) <= self.valid_begin(name) <= now - datetime.timedelta(seconds=3540)
+        # Verify valid_end is set to full window in the future
+        assert self.valid_end(name) > now + datetime.timedelta(days=13)
+        # Verify renewal task is queued in outputupdate table
         assert self.dnssec_updates(name) == before + 1
 
     def test_nsec3_zone_is_renewed_and_published(self):
@@ -76,3 +84,32 @@ class UpdateValidityTest(RPCTest):
         self.run_update_validity()
         assert self.valid_end('unsigned.de') is None
         assert self.dnssec_updates('unsigned.de') == 0
+
+    def test_valid_begin_is_backdated_by_default_skew(self):
+        self.sign('skew.de')
+        now = datetime.datetime.utcnow()
+        begin = self.valid_begin('skew.de')
+        end = self.valid_end('skew.de')
+        assert now - datetime.timedelta(seconds=3660) <= begin <= now - datetime.timedelta(seconds=3540)
+        assert now + datetime.timedelta(days=13, hours=23) <= end <= now + datetime.timedelta(days=14, hours=1)
+
+    def test_custom_validity_skew_attribute(self):
+        self.r.zone_create('custom.de')
+        self.r.zone_set_attrs('custom.de', {'dnssec_validity_skew': 7200})
+        self.r.zone_group_add_zone('zg', 'custom.de')
+        self.r.zone_dnssec_enable('custom.de')
+        now = datetime.datetime.utcnow()
+        begin = self.valid_begin('custom.de')
+        assert now - datetime.timedelta(seconds=7260) <= begin <= now - datetime.timedelta(seconds=7140)
+
+    def test_dryrun_does_not_commit_changes(self):
+        self.sign('dry.de')
+        self.age('dry.de', 8)
+        end_before = self.valid_end('dry.de')
+        updates_before = self.dnssec_updates('dry.de')
+        result = self.app.test_cli_runner().invoke(update_validity, ['-n'])
+        assert result.exit_code == 0
+        assert 'Dry-run' in result.output
+        db.session.rollback()
+        assert self.valid_end('dry.de') == end_before
+        assert self.dnssec_updates('dry.de') == updates_before

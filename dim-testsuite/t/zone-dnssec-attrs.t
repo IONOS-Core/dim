@@ -60,3 +60,23 @@ modified_by:admin
 name:a.com
 views:1
 zone_groups:1
+$ ndcli modify zone a.com set attrs dnssec_validity_skew:-1
+ERROR - Invalid dnssec validity skew: -1
+$ ndcli modify zone a.com set attrs dnssec_validity_skew:abc
+ERROR - Invalid dnssec validity skew: "abc"
+$ ndcli modify zone a.com set attrs dnssec_validity_skew:1800
+WARNING - Setting dnssec_validity_skew to less than 3600 seconds (1 hour) is not recommended (see RFC 6781)
+$ ndcli modify zone a.com set attrs dnssec_validity_skew:7200
+$ ndcli show zone a.com
+created:2015-10-27 14:01:03
+created_by:admin
+default_algorithm:8
+default_ksk_bits:4096
+default_zsk_bits:4096
+dnssec_validity_skew:7200
+dnssec_validity_window:345600
+modified:2015-10-27 14:01:03
+modified_by:admin
+name:a.com
+views:1
+zone_groups:1
