@@ -1050,6 +1050,8 @@ Zone/View Functions
    - *default_algorithm*: default algorithm used for signing
    - *default_ksk_bits*: default KSK length
    - *default_zsk_bits*: default ZSK length
+   - *dnssec_validity_window*: validity period in seconds (minimum 345600 / 4 days, default 1209600 / 14 days)
+   - *dnssec_validity_skew*: signature inception backdating offset in seconds (minimum 0, default 3600 / 1 hour)
 
    The following zone attributes are read-only:
 

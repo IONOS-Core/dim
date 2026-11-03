@@ -119,9 +119,30 @@ class Zone(db.Model, WithAttr, TrackChanges):
                              self.nsec3_iterations,
                              self.nsec3_salt])
 
+    def get_validity_skew(self):
+        '''Gets the DNSSEC signature inception skew in seconds.
+
+        In accordance with RFC 6781 section 4.4.1, signature inception timestamps
+        are backdated by an inception skew offset (typically 1 hour / 3600 seconds)
+        to prevent signature validation failures caused by clock drift between the
+        signing authority and caching resolvers.
+
+        Returns:
+            int: The configured signature inception skew in seconds (defaults to 3600).
+        '''
+        attributes = self.get_attrs()
+        return int(attributes.get('dnssec_validity_skew', 3600))
+
     def set_validity(self):
-        self.valid_begin = datetime.datetime.utcnow()
-        self.valid_end = self.valid_begin + datetime.timedelta(seconds=self.get_validity_window())
+        '''Sets the DNSSEC signature validity window for the zone.
+
+        Backdates valid_begin by the configured validity skew (RFC 6781) to absorb
+        clock drift on validating resolvers, while keeping valid_end set to now + validity_window.
+        Stores the resulting timestamps in the zone table.
+        '''
+        now = datetime.datetime.utcnow()
+        self.valid_begin = now - datetime.timedelta(seconds=self.get_validity_skew())
+        self.valid_end = now + datetime.timedelta(seconds=self.get_validity_window())
 
     def get_validity_window(self):
         attributes = self.get_attrs()
@@ -153,6 +174,11 @@ class Zone(db.Model, WithAttr, TrackChanges):
             validate_int(attrs['default_zsk_bits'], 1, 'Invalid key length')
         if 'dnssec_validity_window' in attrs:
             validate_int(attrs['dnssec_validity_window'], 3600 * 24 * 4, 'Invalid dnssec validity window')
+        if 'dnssec_validity_skew' in attrs:
+            validate_int(attrs['dnssec_validity_skew'], 0, 'Invalid dnssec validity skew')
+            if int(attrs['dnssec_validity_skew']) < 3600:
+                from dim.messages import Messages
+                Messages.warn('Setting dnssec_validity_skew to less than 3600 seconds (1 hour) is not recommended (see RFC 6781)')
 
     def update_registrar_keys(self, keys):
         RegistrarAccountZoneKey.query.filter_by(zone_id=self.id).delete(synchronize_session=False)
