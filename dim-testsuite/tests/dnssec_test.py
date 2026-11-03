@@ -11,6 +11,7 @@ DNSSEC tests, in three layers:
   for an environment that provides all three.
 '''
 import base64
+import datetime
 import hashlib
 import os
 import select
@@ -143,9 +144,13 @@ class ZoneDnssecTest(RPCTest):
 
     def test_enable_sets_the_validity_window(self):
         self.enable()
+        now = datetime.datetime.utcnow()
         zone = self.zone()
         assert zone.valid_begin is not None and zone.valid_end is not None
         assert zone.valid_end > zone.valid_begin
+        # valid_begin must be backdated by 1 hour (RFC 6781 skew)
+        assert now - datetime.timedelta(seconds=3660) <= zone.valid_begin <= now - datetime.timedelta(seconds=3540)
+        assert now + datetime.timedelta(days=13, hours=23) <= zone.valid_end <= now + datetime.timedelta(days=14, hours=1)
 
     def test_enable_without_nsec3(self):
         self.enable()
@@ -364,6 +369,18 @@ class PdnsOutputDnssecTest(PDNSTest):
         # created without a profile has no NS rrset)
         assert set(['SOA', 'DNSKEY', 'NSEC', 'A', 'TXT']) <= covered, covered
         assert self.metadata().get('SIGN_PARAM')
+
+    def test_rrsig_inception_is_backdated_in_powerdns(self):
+        now = datetime.datetime.utcnow()
+        self.sign_zone()
+        rrsigs = self.records('RRSIG')
+        assert rrsigs, 'no RRSIGs were exported'
+        for row in rrsigs:
+            tokens = row[2].split()
+            expiration_dt = datetime.datetime.strptime(tokens[4], '%Y%m%d%H%M%S')
+            inception_dt = datetime.datetime.strptime(tokens[5], '%Y%m%d%H%M%S')
+            assert now - datetime.timedelta(seconds=3660) <= inception_dt <= now - datetime.timedelta(seconds=3540)
+            assert now + datetime.timedelta(days=13, hours=23) <= expiration_dt <= now + datetime.timedelta(days=14, hours=1)
 
     def test_nsec3_zone_is_signed(self):
         self.sign_zone(nsec3_algorithm=1, nsec3_iterations=10)

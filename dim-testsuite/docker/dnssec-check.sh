@@ -106,7 +106,27 @@ check_zone nsec3.com nsec3 10
 check_zone nsec3-salt.com nsec3 100 salted
 
 echo
-echo "### pdns-output log (last lines)"
-tail -3 /tmp/pdns-output.log
+echo "######## testing update-validity renewal cycle end-to-end"
+echo "--- aging nsec.com and nsec3.com by 8 days in dim database"
+mysql -h127.0.0.1 -P3307 -udim -pdim dim -e \
+    "UPDATE zone SET valid_begin = valid_begin - INTERVAL 8 DAY, valid_end = valid_end - INTERVAL 8 DAY WHERE name IN ('nsec.com', 'nsec3.com')"
+
+echo "--- running manage_dim update-validity -v"
+/src/dim/manage_dim update-validity -v
+
+echo "--- waiting for pdns-output to process renewals"
+wait_for_queue
+
+for zone in nsec.com nsec3.com; do
+    echo "--- verifying renewed zone $zone with drill and jdnssec-verifyzone"
+    ndcli list zone "$zone" dnskeys --rr > /tmp/trusted-key.key
+    drill "@$PDNS_ADDRESS" "t.$zone" A -S -k /tmp/trusted-key.key | grep ';; Chase'
+    dig +onesoa +noall +answer axfr "$zone" "@$PDNS_ADDRESS" > "/tmp/$zone-renewed.axfr"
+    java -cp /opt/dim/pdns-output.jar com.verisignlabs.dnssec.cl.VerifyZone "/tmp/$zone-renewed.axfr"
+done
+
 echo
-echo "### all dnssec zones verified"
+echo "### pdns-output log (last lines)"
+tail -5 /tmp/pdns-output.log
+echo
+echo "### all dnssec zones verified (including renewal cycle)"
