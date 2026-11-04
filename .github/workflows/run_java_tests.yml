@@ -1,0 +1,66 @@
+name: Java Tests (pdns-output)
+
+on:
+  push:
+    paths:
+      - 'pdns-output/**'
+      - '.github/workflows/run_java_tests.yml'
+  pull_request:
+    paths:
+      - 'pdns-output/**'
+      - '.github/workflows/run_java_tests.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "yes"
+        ports:
+          - 3307:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=5s --health-timeout=2s --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Initialize PowerDNS test database
+        run: |
+          sudo apt-get update && sudo apt-get install -y mariadb-client
+          mysql --skip-ssl -h 127.0.0.1 -P 3307 -u root -e "CREATE DATABASE pdns1; CREATE USER 'pdns'@'%' IDENTIFIED BY 'pdns'; GRANT ALL PRIVILEGES ON pdns1.* TO 'pdns'@'%'; FLUSH PRIVILEGES;"
+          mysql --skip-ssl -h 127.0.0.1 -P 3307 -u pdns -ppdns pdns1 < dim-testsuite/testenv/pdns.sql
+          mysql --skip-ssl -h 127.0.0.1 -P 3307 -u pdns -ppdns pdns1 -e "ALTER TABLE domains ADD COLUMN IF NOT EXISTS options TEXT DEFAULT NULL, ADD COLUMN IF NOT EXISTS catalog VARCHAR(255) DEFAULT NULL;"
+
+      - name: Start PowerDNS auth server on port 5153
+        run: |
+          sed -e 's/^local-address=.*/local-address=127.0.0.1/' \
+              -e 's/^local-port=.*/local-port=5153/' \
+              -e 's/^loglevel=.*/loglevel=6/' \
+              -e 's/^log-dns-details=.*/log-dns-details=yes/' \
+              dim-testsuite/docker/pdns1.conf > /tmp/pdns-unit.conf
+          docker run -d --name pdns-unit --network host \
+              -v /tmp/pdns-unit.conf:/etc/powerdns/pdns.conf:ro powerdns/pdns-auth-50:5.0.3
+          for i in {1..30}; do
+            if nc -z 127.0.0.1 5153 2>/dev/null; then
+              echo "PowerDNS is ready on port 5153!"
+              break
+            fi
+            sleep 0.5
+          done
+
+      - name: Run Gradle tests
+        run: ./gradlew test
+        working-directory: pdns-output
+
+      - name: Print PowerDNS log on failure
+        if: failure()
+        run: docker logs pdns-unit 2>&1 || true
