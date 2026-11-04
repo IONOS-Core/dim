@@ -66,7 +66,7 @@ RUN python -m venv /src/dim-testsuite/virtual_env \
     && /src/dim-testsuite/virtual_env/bin/pip install --no-cache-dir \
         -r dim/requirements.txt \
         -r ndcli/requirements.txt \
-        'pytest~=7.1' 'pytest-cov~=3.0'
+        'pytest~=7.1' 'pytest-cov~=3.0' 'Sphinx'
 
 COPY dim/ dim/
 COPY dimclient/ dimclient/
