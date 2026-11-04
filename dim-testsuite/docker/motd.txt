@@ -1,0 +1,13 @@
+================================================================================
+  DIM LOCAL TESTBED (Interactive Shell)
+================================================================================
+  * API         : http://localhost:5000 (pre-authenticated as admin)
+  * DNS Queries : 'dig' automatically queries local PowerDNS (@127.1.1.1)
+  * Live Mounts : Local ./dim, ./dimclient, ./ndcli
+  * Tab-Complete: Press <Tab> for ndcli commands, options, and zone names
+================================================================================
+  Useful Commands:
+    • Seed demo data : /src/dim-testsuite/docker/seed.sh
+    • Run .t tests   : make test TESTS=container-autocorrect.t
+    • Run pytests    : pytest tests/dns_test.py
+================================================================================

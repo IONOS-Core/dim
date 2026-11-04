@@ -1,14 +1,37 @@
 #!/bin/bash
 #
-# Runs the test suites inside the container. See dim-testsuite/compose.yaml.
+# Runs the test suites or services inside the container. See dim-testsuite/compose.yaml.
 #
-# Usage: entrypoint.sh [all|pytest|ndcli|dnssec|dnssec-diff|shell]
+# Usage: entrypoint.sh [all|pytest|ndcli|dnssec|dnssec-diff|shell|mw|output]
 #
 set -eu
 
 cd /src/dim-testsuite
 
-export PATH="/src/dim-testsuite/virtual_env/bin:$PATH"
+# Install dig wrapper so DNS queries in the testbed default to local PowerDNS (127.1.1.1)
+if [ -f /src/dim-testsuite/docker/dig-wrapper.sh ] && [ ! -L /usr/local/bin/dig ]; then
+    ln -sf /src/dim-testsuite/docker/dig-wrapper.sh /usr/local/bin/dig
+fi
+
+# Ensure ndcli, manage_dim, manage_db, and pytest are in PATH and /opt/dim/bin
+mkdir -p /opt/dim/bin
+for bin in ndcli manage_dim manage_db pytest; do
+    if [ -f "/src/dim-testsuite/virtual_env/bin/$bin" ]; then
+        ln -sf "/src/dim-testsuite/virtual_env/bin/$bin" "/usr/local/bin/$bin"
+        ln -sf "/src/dim-testsuite/virtual_env/bin/$bin" "/opt/dim/bin/$bin"
+    fi
+done
+
+# Ensure colored aliases are active in all interactive and non-interactive bash shells
+for rc in /etc/bash.bashrc /root/.bashrc; do
+    if ! grep -q "alias ll=" "$rc" 2>/dev/null; then
+        echo 'alias ls="ls --color=auto"' >> "$rc"
+        echo 'alias ll="ls -lh --color=auto"' >> "$rc"
+        echo 'alias la="ls -lha --color=auto"' >> "$rc"
+    fi
+done
+
+export PATH="/usr/local/bin:/src/dim-testsuite/virtual_env/bin:$PATH"
 # FLASK_APP is not exported on purpose: the Makefile passes its own (quoted)
 # value to the shell, an exported one would override it and break quoting
 
@@ -83,7 +106,11 @@ case "${1:-all}" in
         run_pytest
         ;;
     ndcli)
-        run_ndcli
+        if [ "$#" -gt 1 ]; then
+            exec /src/dim-testsuite/virtual_env/bin/ndcli "${@:2}"
+        else
+            run_ndcli
+        fi
         ;;
     dnssec)
         run_dnssec
@@ -92,7 +119,39 @@ case "${1:-all}" in
         exec docker/dnssec-diff.sh
         ;;
     shell)
-        exec /bin/bash
+        exec /src/dim-testsuite/docker/testbed-shell.sh
+        ;;
+    mw)
+        if ! mysql -h127.0.0.1 -P3307 -udim -pdim -e 'select 1 from user limit 1' dim >/dev/null 2>&1; then
+            echo "### initializing fresh dim and powerdns databases"
+            make db
+
+            echo "### starting dim middleware API on port 5000"
+            FLASK_APP='dim:create_app(db_mode="TEST")' flask run --host=0.0.0.0 --port=5000 &
+            FLASK_PID=$!
+
+            wait_for "DIM Middleware API" "echo > /dev/tcp/localhost/5000"
+
+            echo "### configuring default output and zone-group"
+            ndcli login -p p >/dev/null 2>&1 || true
+            ndcli create output out plugin pdns-db db-uri "mysql://pdns:pdns@127.0.0.1:3307/pdns1" >/dev/null 2>&1 || true
+            ndcli create zone-group zg >/dev/null 2>&1 || true
+            ndcli modify output out add zone-group zg >/dev/null 2>&1 || true
+        else
+            echo "### starting dim middleware API on port 5000 (existing database)"
+            FLASK_APP='dim:create_app(db_mode="TEST")' flask run --host=0.0.0.0 --port=5000 &
+            FLASK_PID=$!
+            wait_for "DIM Middleware API" "echo > /dev/tcp/localhost/5000"
+        fi
+
+        echo "[OK] DIM Middleware is ready on http://localhost:5000"
+        trap 'kill -TERM $FLASK_PID 2>/dev/null; wait $FLASK_PID' SIGTERM SIGINT
+        wait $FLASK_PID
+        ;;
+    output)
+        wait_for "DIM Middleware API" "echo > /dev/tcp/localhost/5000"
+        echo "### starting pdns-output daemon"
+        exec java -jar /opt/dim/pdns-output.jar --config tests/pdns-output-test.properties
         ;;
     *)
         exec "$@"

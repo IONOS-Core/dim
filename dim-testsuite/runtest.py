@@ -423,6 +423,8 @@ if __name__ == '__main__':
     host = parsed.hostname
     port = parsed.port
 
+    os.makedirs(os.path.dirname(SRVLOG), exist_ok=True)
+    os.makedirs(OUT_DIR, exist_ok=True)
     logfile = open(SRVLOG, 'wb+')
     server = Popen([VFLASK, 'run', '--port', str(port), '--host', str(host)], stderr=STDOUT, stdout=logfile)
 
@@ -440,7 +442,7 @@ if __name__ == '__main__':
         elif test == '-d':
             run_diff = True
         else:
-            tests.append(test)
+            tests.append(os.path.basename(test))
     if not tests:
         with os.scandir(T_DIR) as it:
             tests = sorted([e.name for e in it if e.is_file()])

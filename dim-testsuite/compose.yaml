@@ -16,7 +16,6 @@ services:
     tmpfs:
       - /var/lib/mysql
     healthcheck:
-      # only true once the init scripts ran and the real server listens on tcp
       test: ["CMD", "mysql", "-h127.0.0.1", "-P3307", "-uroot", "-e", "select count(*) from domains", "pdns1"]
       interval: 2s
       timeout: 5s
@@ -41,6 +40,57 @@ services:
       mariadb:
         condition: service_healthy
 
+  dim-mw:
+    build:
+      context: ..
+      dockerfile: dim-testsuite/Dockerfile
+    network_mode: "service:mariadb"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      pdns1:
+        condition: service_started
+      pdns2:
+        condition: service_started
+    volumes:
+      - ../dim/dim:/src/dim/dim:ro
+      - ../dimclient/dimclient:/src/dimclient/dimclient:ro
+      - ../ndcli/dimcli:/src/ndcli/dimcli:ro
+      - ./docker:/src/dim-testsuite/docker:ro
+    environment:
+      PYTHONPATH: "/src/dim:/src/dimclient:/src/ndcli"
+      NDCLI_SERVER: "http://localhost:5000"
+      NDCLI_USERNAME: "admin"
+    command: ["mw"]
+
+  dim-output:
+    build:
+      context: ..
+      dockerfile: dim-testsuite/Dockerfile
+    network_mode: "service:mariadb"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      pdns1:
+        condition: service_started
+      pdns2:
+        condition: service_started
+      dim-mw:
+        condition: service_started
+    volumes:
+      - ./docker:/src/dim-testsuite/docker:ro
+      - ../pdns-output:/src/pdns-output
+    command: ["output"]
+
+  docs:
+    build:
+      context: ..
+      dockerfile: dim-testsuite/Dockerfile
+    volumes:
+      - ../dim/doc:/src/dim/doc
+    entrypoint: ["/src/dim-testsuite/virtual_env/bin/sphinx-build"]
+    command: ["-b", "html", "-d", "/src/dim/doc/_build/doctrees", "/src/dim/doc", "/src/dim/doc/_build/html"]
+
   testsuite:
     build:
       context: ..
@@ -53,9 +103,16 @@ services:
         condition: service_started
       pdns2:
         condition: service_started
+    volumes:
+      - ../dim/dim:/src/dim/dim:ro
+      - ../dimclient/dimclient:/src/dimclient/dimclient:ro
+      - ../ndcli/dimcli:/src/ndcli/dimcli:ro
+      - ../dim-testsuite/tests:/src/dim-testsuite/tests:ro
+      - ../dim-testsuite/t:/src/dim-testsuite/t:ro
+      - ../dim-testsuite/docker:/src/dim-testsuite/docker:ro
+      - ./runtest.py:/src/dim-testsuite/runtest.py:ro
     environment:
-      # subset of the tests in t/ to run, empty means all of them
+      PYTHONPATH: "/src/dim:/src/dimclient:/src/ndcli"
       TESTS: "${TESTS:-}"
-      # -k expression for the pytest suite, empty means all of them
       PYTESTS: "${PYTESTS:-}"
     command: ["all"]
