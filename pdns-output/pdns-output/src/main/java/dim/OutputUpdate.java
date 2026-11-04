@@ -1,5 +1,7 @@
 package dim;
 
+import static dim.Util.name;
+
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Date;
@@ -18,8 +20,6 @@ import org.xbill.DNS.Type;
 import org.xbill.DNS.utils.base16;
 
 import com.verisignlabs.dnssec.security.DnsKeyPair;
-
-import static dim.Util.name;
 
 class Key {
     public final DnsKeyPair dnsKeyPair;
@@ -60,7 +60,7 @@ class OutputUpdate {
     private final String content;
 
     OutputUpdate(long id, String transaction, String action, long output_id, String zone_name, long serial,
-                 String name, int ttl, String type, String content) {
+            String name, int ttl, String type, String content) {
         this.id = id;
         this.transaction = transaction;
         this.action = action;
@@ -110,29 +110,30 @@ class OutputUpdate {
                     break;
                 case CREATE_RR: {
                     Record r = Record.fromString(name(name), Type.value(type), DClass.IN, ttl, content, domain);
-                    db.updateSerial(name(zone_name), serial);
-                    ZoneSignParameters zsp = null;
-                    if (db.isSigned(domain))
-                        zsp = getZSP(dim, signer);
-                    if (zsp != null) {
+                    // Signed zone: validate parameters and get ZSP BEFORE updating PowerDNS
+                    if (db.isSigned(domain)) {
+                        ZoneSignParameters zsp = getZSP(dim, signer);
+                        db.updateSerial(name(zone_name), serial);
                         signer.incrementalAdd(domain, r, zsp);
                         signer.signRRSet(domain, domain, Type.SOA, zsp);
                     } else {
+                        db.updateSerial(name(zone_name), serial);
                         db.addRow(domain, new Row(r));
                     }
                     break;
                 }
                 case DELETE_RR: {
-                    db.updateSerial(domain, serial);
-                    ZoneSignParameters zsp = null;
-                    if (db.isSigned(domain))
-                        zsp = getZSP(dim, signer);
                     Record r = Record.fromString(name(name), Type.value(type), DClass.IN, ttl, content, domain);
-                    if (zsp != null) {
+                    // Signed zone: validate parameters and get ZSP BEFORE updating PowerDNS
+                    if (db.isSigned(domain)) {
+                        ZoneSignParameters zsp = getZSP(dim, signer);
+                        db.updateSerial(domain, serial);
                         signer.incrementalDelete(domain, r, zsp);
                         signer.signRRSet(domain, domain, Type.SOA, zsp);
-                    } else
+                    } else {
+                        db.updateSerial(domain, serial);
                         db.deleteRecord(domain, r);
+                    }
                     break;
                 }
                 case UPDATE_SOA:
@@ -144,10 +145,13 @@ class OutputUpdate {
                 case NSEC3PARAM:
                 case DNSSEC_UPDATE: {
                     List<Key> keys = getKeys(dim, signer);
+                    // Check if DNSSEC is being disabled (no keys or only KSKs left)
                     if (keys.isEmpty() || keys.stream().allMatch(x -> isKSK(x.dnsKeyPair))) {
+                        // If disabled, strip all DNSSEC records and mark zone as unsigned in PowerDNS
                         db.deleteDNSSECRecords(domain);
                         db.setSignStatus(domain, false);
                     } else {
+                        // Otherwise, load signing parameters and re-sign the entire zone
                         ZoneSignParameters zsp = getZSP(dim, signer);
                         if (zsp != null)
                             signer.resignZone(domain, zsp);
@@ -155,6 +159,9 @@ class OutputUpdate {
                     break;
                 }
             }
+        } catch (SignatureRefusedException e) {
+            log.error("[DNSSEC] [REFUSED] Refusing signature update for zone {}: {}", zone_name, e.getMessage());
+            throw new RuntimeException("DNSSEC signature refused: " + e.getMessage(), e);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -177,24 +184,43 @@ class OutputUpdate {
         return keys;
     }
 
-    private ZoneSignParameters getSigningParameters(DSLContext dim) {
-        org.jooq.Record result = dim.fetchOne("SELECT nsec3_algorithm, nsec3_iterations, nsec3_salt," +
-                " valid_begin, valid_end FROM zone WHERE zone.name=?", zone_name);
-        if (result == null)
-            return null;
-        Integer algorithm = result.get(0, Integer.class);
-        Date begin = result.get(3, Date.class);
-        Date end = result.get(4, Date.class);
-        NSECParameters nsecParameters;
-        if (algorithm == null || algorithm == 0)
-            nsecParameters = NSECParameters.NSEC();
-        else {
-            String salt = result.get(2, String.class);
-            byte[] saltBytes = null;
-            if (salt != null && !salt.equals("-"))
-                saltBytes = base16.fromString(salt);
-            nsecParameters = NSECParameters.NSEC3(result.get(1, Integer.class), saltBytes);
+    /**
+     * Loads DNSSEC parameters (validity interval and NSEC/NSEC3 configuration)
+     * for this zone from the 'zone' table in the DIM database.
+     *
+     * @param dim the database context for the DIM master database
+     * @return partial ZoneSignParameters containing timestamps and NSEC parameters,
+     *         or null if the zone was not found
+     */
+    private ZoneSignParameters getSigningParameters(DSLContext dim) throws SignatureRefusedException {
+        org.jooq.Record result = dim.fetchOne(
+                "SELECT nsec3_algorithm, nsec3_iterations, nsec3_salt, valid_begin, valid_end " +
+                        "FROM zone WHERE zone.name = ?",
+                zone_name);
+        if (result == null) {
+            throw new SignatureRefusedException(
+                    "Zone " + zone_name + " not found in DIM database while loading signing parameters");
         }
+
+        // Extract columns by name for clarity and safety
+        Integer algorithm = result.get("nsec3_algorithm", Integer.class);
+        Integer iterations = result.get("nsec3_iterations", Integer.class);
+        String salt = result.get("nsec3_salt", String.class);
+        Date begin = result.get("valid_begin", Date.class);
+        Date end = result.get("valid_end", Date.class);
+
+        // Configure NSEC or NSEC3 mode based on algorithm
+        NSECParameters nsecParameters;
+        if (algorithm == null || algorithm == 0) {
+            nsecParameters = NSECParameters.NSEC();
+        } else {
+            byte[] saltBytes = null;
+            if (salt != null && !salt.equals("-")) {
+                saltBytes = base16.fromString(salt);
+            }
+            nsecParameters = NSECParameters.NSEC3(iterations, saltBytes);
+        }
+
         return new ZoneSignParameters(null, null, begin, end, nsecParameters);
     }
 
@@ -202,19 +228,50 @@ class OutputUpdate {
         return (dnsKeyPair.getDNSKEYRecord().getFlags() & DNSKEYRecord.Flags.SEP_KEY) != 0;
     }
 
-    private ZoneSignParameters getZSP(DSLContext dim, Signer signer) {
+    /**
+     * Assembles the complete ZoneSignParameters for this zone, combining keys
+     * from the 'zonekey' table with timestamps and NSEC parameters from the 'zone'
+     * table.
+     *
+     * @param dim    the database context for the DIM master database
+     * @param signer the Signer instance used to retrieve SOA minimum TTL
+     * @return complete ZoneSignParameters ready for signing, or null if keys are
+     *         missing
+     */
+    private ZoneSignParameters getZSP(DSLContext dim, Signer signer) throws SignatureRefusedException {
+        // 1. Load all keys for this zone from the 'zonekey' table
         List<Key> keys = getKeys(dim, signer);
-        if (keys.isEmpty())
-            return null;
-        List<DnsKeyPair> ksk = keys.stream().filter(k -> isKSK(k.dnsKeyPair)).map(k -> k.dnsKeyPair)
+        if (keys.isEmpty()) {
+            throw new SignatureRefusedException("No keys (ZSK or KSK) found for zone: " + zone_name);
+        }
+
+        // 2. Separate keys into Key Signing Keys (KSK) and Zone Signing Keys (ZSK)
+        List<DnsKeyPair> ksk = keys.stream()
+                .filter(k -> isKSK(k.dnsKeyPair))
+                .map(k -> k.dnsKeyPair)
                 .collect(Collectors.toList());
-        List<DnsKeyPair> zsk = keys.stream().filter(k -> !isKSK(k.dnsKeyPair)).map(k -> k.dnsKeyPair)
+
+        List<DnsKeyPair> zsk = keys.stream()
+                .filter(k -> !isKSK(k.dnsKeyPair))
+                .map(k -> k.dnsKeyPair)
                 .collect(Collectors.toList());
-        if (zsk.isEmpty())
-            return null;
+
+        // A zone cannot be signed without at least one ZSK
+        if (zsk.isEmpty()) {
+            throw new SignatureRefusedException("No ZSK found for zone: " + zone_name);
+        }
+
+        // A zone cannot be signed without at least one KSK
+        if (ksk.isEmpty()) {
+            throw new SignatureRefusedException("No KSK found for zone: " + zone_name);
+        }
+
+        // 3. Load validity window (valid_begin/end) and NSEC parameters from 'zone'
+        // table
         ZoneSignParameters zsp = getSigningParameters(dim);
-        if (zsp == null)
-            return null;
+        DnssecGatekeeper.validateParameters(name(zone_name), zsp);
+
+        // 4. Combine the loaded keys with the validity parameters
         return zsp.withKeys(ksk, zsk);
     }
 }
