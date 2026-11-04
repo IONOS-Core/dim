@@ -127,6 +127,8 @@ case "${1:-all}" in
             make db
 
             echo "### starting dim middleware API on port 5000"
+            fuser -k 5000/tcp >/dev/null 2>&1 || true
+            sleep 0.5
             FLASK_APP='dim:create_app(db_mode="TEST")' flask run --host=0.0.0.0 --port=5000 &
             FLASK_PID=$!
 
@@ -139,6 +141,8 @@ case "${1:-all}" in
             ndcli modify output out add zone-group zg >/dev/null 2>&1 || true
         else
             echo "### starting dim middleware API on port 5000 (existing database)"
+            fuser -k 5000/tcp >/dev/null 2>&1 || true
+            sleep 0.5
             FLASK_APP='dim:create_app(db_mode="TEST")' flask run --host=0.0.0.0 --port=5000 &
             FLASK_PID=$!
             wait_for "DIM Middleware API" "echo > /dev/tcp/localhost/5000"

@@ -32,7 +32,7 @@ java-test:  ## Run pdns-output Java test suite (requires active testbed)
 		exit 1; \
 	fi
 	@echo "==> Running pdns-output Java tests..."
-	@$(COMPOSE) exec dim-output bash -c "cd /src/pdns-output && ./gradlew test --info"
+	@cd pdns-output && ./gradlew test
 
 testbed-test:  ## Run E2E CLI scenario tests (t/*.t) in container (optional: TESTS="name.t")
 	@echo "==> Running E2E scenario test suite inside container..."
@@ -55,7 +55,8 @@ docs-serve: docs  ## Build and serve HTML documentation on http://localhost:8080
 
 testbed-start:  ## Start all local testbed containers in background (instant start, no slow rebuild)
 	@echo "==> Starting local DIM testbed in background..."
-	$(COMPOSE) up -d --remove-orphans mariadb pdns1 pdns2 dim-mw dim-output
+	@docker rm -f $$(docker ps -aq --filter "name=dim-testsuite-testsuite-run") >/dev/null 2>&1 || true
+	$(COMPOSE) up -d --remove-orphans mariadb pdns1 pdns2 pdns-unit dim-mw dim-output
 	@echo ""
 	@echo "[OK] DIM Testbed is running!"
 	@echo "  • Run 'make testbed-shell' for interactive testbed shell (ndcli, dig)"
@@ -72,8 +73,7 @@ testbed-stop:  ## Stop local testbed and tear down containers
 	@echo "[OK] Testbed stopped and cleaned up."
 
 testbed-status:  ## Show status of testbed services and ports
-	@echo "==> Active testbed containers:"
-	@docker ps --filter "name=dim-testsuite" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+	@./dim-testsuite/docker/status.sh
 
 testbed-logs:  ## Follow live logs from DIM middleware and pdns-output daemon
 	@$(COMPOSE) logs -f dim-mw dim-output

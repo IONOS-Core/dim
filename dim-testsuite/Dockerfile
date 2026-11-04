@@ -34,7 +34,7 @@ FROM python:3.11-slim-bookworm
 # pdns-output and the dnssec verification in tests/pdns_util.py need a jre
 ENV JAVA_HOME=/opt/java/openjdk
 ENV PATH=$JAVA_HOME/bin:$PATH
-COPY --from=eclipse-temurin:21-jre $JAVA_HOME $JAVA_HOME
+COPY --from=eclipse-temurin:21-jdk $JAVA_HOME $JAVA_HOME
 # the jre the pre-java-21 pdns-output ran on, used by docker/dnssec-diff.sh to
 # run the baseline jar
 COPY --from=eclipse-temurin:8-jre /opt/java/openjdk /opt/java8

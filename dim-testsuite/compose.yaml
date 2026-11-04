@@ -15,6 +15,9 @@ services:
     # every run starts from an empty database
     tmpfs:
       - /var/lib/mysql
+    ports:
+      - "127.0.0.1:3307:3307"
+      - "127.0.0.1:5153:5153"
     healthcheck:
       test: ["CMD", "mysql", "-h127.0.0.1", "-P3307", "-uroot", "-e", "select count(*) from domains", "pdns1"]
       interval: 2s
@@ -36,6 +39,15 @@ services:
     network_mode: "service:mariadb"
     volumes:
       - ./docker/pdns2.conf:/etc/powerdns/pdns.conf:ro
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+  pdns-unit:
+    image: powerdns/pdns-auth-50:5.0.3
+    network_mode: "service:mariadb"
+    volumes:
+      - ./docker/pdns-unit.conf:/etc/powerdns/pdns.conf:ro
     depends_on:
       mariadb:
         condition: service_healthy
@@ -80,6 +92,7 @@ services:
     volumes:
       - ./docker:/src/dim-testsuite/docker:ro
       - ../pdns-output:/src/pdns-output
+      - ../pdns-output/pdns-output/build/libs/pdns-output-5.0.3-all.jar:/opt/dim/pdns-output.jar:ro
     command: ["output"]
 
   docs:
@@ -111,6 +124,7 @@ services:
       - ../dim-testsuite/t:/src/dim-testsuite/t:ro
       - ../dim-testsuite/docker:/src/dim-testsuite/docker:ro
       - ./runtest.py:/src/dim-testsuite/runtest.py:ro
+      - ../pdns-output/pdns-output/build/libs/pdns-output-5.0.3-all.jar:/opt/dim/pdns-output.jar:ro
     environment:
       PYTHONPATH: "/src/dim:/src/dimclient:/src/ndcli"
       TESTS: "${TESTS:-}"
