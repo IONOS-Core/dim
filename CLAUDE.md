@@ -12,6 +12,13 @@ Before contributing code or opening pull requests, please read [CONTRIBUTING.md]
 - `pdns-output/`: Java daemon that polls DIM `outputupdate` table, signs zones with DNSSEC, and synchronizes records into PowerDNS databases.
 - `dim-testsuite/`: Containerized testbed and test suites (MariaDB, PowerDNS 1 & 2, pytest suites, CLI integration tests).
 
+## Core Invariants & Architecture Guarantees
+- **Zero Divergence between DIM and PowerDNS:**
+  DIM is the authoritative source of truth. The `outputupdate` table operates as a strictly transactional queue.
+  When an event is queued in `outputupdate`, DIM assumes it will be applied to PowerDNS. Under no circumstances may `pdns-output` silently drop, ignore, or swallow exceptions on updates.
+  - **No Partial Transactions:** Operations must be atomic. Never perform partial mutations (such as bumping SOA serial via `updateSerial`) before validating that all signing parameters and records are valid.
+  - **Fail-Stop with Rollback:** If an update fails (e.g., DNSSEC gatekeeper refuses future-dated signatures, database errors), `pdns-output` must trigger a complete rollback in PowerDNS, keep the transaction queued in `outputupdate`, and write the failure reason to `output.status` so monitoring immediately alerts operators. Silently acknowledging or deleting failed transactions causes irreversible split-brain divergence.
+
 ## Testbed Architecture Diagram
 
 ```text

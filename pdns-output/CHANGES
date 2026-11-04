@@ -1,3 +1,8 @@
+to be released
+--------------
+* implement pre-publishing DNSSEC signature gatekeeper to refuse future-dated or expired signatures before modifying PowerDNS (RFC 6781)
+* fix silent fallback in OutputUpdate that allowed inserting plain unsigned records into DNSSEC-signed zones when signing parameters could not be retrieved
+
 5.0.3
 -----
 * upgrade build and runtime to Java 21 and Gradle 9.5.1 (#329)
