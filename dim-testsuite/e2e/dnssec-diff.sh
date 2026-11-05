@@ -56,7 +56,20 @@ PDNS_MYSQL=(mysql -h127.0.0.1 -P3307 -updns -ppdns pdns1)
 
 ZONES="nsec.com nsec3.com nsec3salt.com parent.com child.parent.com rollover.com plain.com"
 
-[ -f "$OLD_JAR" ] || { echo "old jar $OLD_JAR not found" >&2; exit 1; }
+if [ ! -f "$OLD_JAR" ]; then
+    echo "Notice: Differential DNSSEC check skipped: OLD_JAR ($OLD_JAR) not mounted."
+    exit 0
+fi
+
+if [ ! -f "$NEW_JAR" ]; then
+    for jar in /src/pdns-output/pdns-output/build/libs/*-all.jar; do
+        if [ -f "$jar" ]; then
+            NEW_JAR="$jar"
+            break
+        fi
+    done
+fi
+
 [ -f "$NEW_JAR" ] || { echo "new jar $NEW_JAR not found" >&2; exit 1; }
 rm -rf "$OUT"
 mkdir -p "$OUT"
@@ -237,14 +250,19 @@ run_jar() {
     wait_for_queue
     dump_pdns "$dir/1-initial"
     if grep -q libgmp "/proc/$jar_pid/maps"; then echo yes; else echo no; fi > "$dir/libgmp-loaded"
+    # verify_served_zones returns non-zero when RRSIG verification fails;
+    # continue to capture output so downstream 'grep -q INVALID' can perform evaluation
     verify_served_zones "$dir" > "$dir/1-initial.verify" || true
 
     incremental_changes
     wait_for_queue
     dump_pdns "$dir/2-incremental"
+    # verify_served_zones returns non-zero when RRSIG verification fails;
+    # continue to capture output so downstream 'grep -q INVALID' can perform evaluation
     verify_served_zones "$dir" > "$dir/2-incremental.verify" || true
 
     kill "$jar_pid"
+    # Best-effort wait for background jar termination
     wait "$jar_pid" 2>/dev/null || true
     jar_pid=
     stop_dim

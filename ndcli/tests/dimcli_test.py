@@ -1,3 +1,14 @@
+"""Integration tests for dimcli / ndcli.
+
+This module contains full integration tests for dimcli / ndcli that require
+an active DIM middleware server on http://localhost:5000 with test accounts
+(admin, net, user).
+
+In contrast, ndcli/tests/cliparse_test.py contains isolated unit tests for CLI
+argument and command parsing that do not require external services and are
+executed by `make test-ndcli`.
+"""
+
 import sys
 import textwrap
 import unittest

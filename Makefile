@@ -1,4 +1,4 @@
-.PHONY: help check test java-test testbed-test lint docs docs-serve testbed-start testbed-build testbed-stop testbed-status testbed-seed testbed-shell testbed-logs shell-output shell-pdns restart-mw restart-output clean
+.PHONY: help check lint test-dim test-pdns-output test-ndcli test-e2e test-all docs docs-serve testbed-start testbed-build testbed-stop testbed-status testbed-seed testbed-shell testbed-logs shell-output shell-pdns restart-mw restart-output clean
 .DEFAULT_GOAL := help
 
 COMPOSE ?= docker compose -f dim-testsuite/compose.yaml
@@ -11,32 +11,45 @@ help:  ## Show this help message
 
 ##@ Code Quality & Verification
 
-check: lint test  ## Run syntax validation and unit test suites
+check: lint test-dim test-ndcli  ## Run syntax validation and fast unit test suites
 
 lint:  ## Check Python and shell script syntax
 	@echo "==> Checking Python syntax..."
 	@$(PYTHON) -m py_compile dim/dim/models/*.py dim/dim/*.py ndcli/dimcli/*.py
 	@echo "==> Checking shell script syntax..."
-	@bash -n dim-testsuite/docker/*.sh
+	@bash -n dim-testsuite/docker/*.sh dim-testsuite/e2e/*.sh
 	@echo "[OK] Syntax checks passed!"
 
-test:  ## Run pytest unit/integration tests (optional: PYTESTS="expression")
-	@echo "==> Running pytest suite inside container..."
+test-dim:  ## Run DIM middleware pytest suite in container (optional: PYTESTS="expression")
+	@echo "==> Running DIM middleware pytest suite inside container..."
 	@$(COMPOSE) run --rm -e PYTESTS="$(PYTESTS)" testsuite pytest
 
-java-test:  ## Run pdns-output Java test suite (requires active testbed)
+test-pdns-output:  ## Run pdns-output Java test suite (requires active testbed)
 	@if ! docker ps --filter "name=dim-testsuite-mariadb" --format '{{.Names}}' | grep -q 'mariadb'; then \
 		echo "[ERROR] The testbed is not running!"; \
-		echo "        Java tests require an active PowerDNS test database."; \
-		echo "        Please run 'make testbed-start' first before running 'make java-test'."; \
+		echo "        pdns-output tests require an active PowerDNS test database."; \
+		echo "        Please run 'make testbed-start' first before running 'make test-pdns-output'."; \
 		exit 1; \
 	fi
-	@echo "==> Running pdns-output Java tests..."
-	@$(COMPOSE) exec dim-output bash -c "cd /src/pdns-output && ./gradlew test --info"
+	@echo "==> Running pdns-output tests..."
+	@cd pdns-output && ./gradlew test
 
-testbed-test:  ## Run E2E CLI scenario tests (t/*.t) in container (optional: TESTS="name.t")
+test-ndcli:  ## Run ndcli CLI unit tests
+	@echo "==> Running ndcli CLI unit tests..."
+	@PYTHONPATH="dimclient:ndcli:$${PYTHONPATH:-}" $(PYTHON) -m pytest ndcli/tests/cliparse_test.py
+
+test-e2e:  ## Run E2E CLI scenario tests (t/*.t) in container (optional: TESTS="name.t")
+	@if docker ps --filter "name=dim-testsuite" --format '{{.Names}}' | grep -q 'dim-testsuite'; then \
+		echo "[ERROR] An active DIM testbed is currently running!"; \
+		echo "        E2E scenario tests require a clean, virgin environment to prevent port collisions (port 5000)"; \
+		echo "        and database lock contention ('pdns_poller')."; \
+		echo "        Please run 'make testbed-stop' first before executing 'make test-e2e'."; \
+		exit 1; \
+	fi
 	@echo "==> Running E2E scenario test suite inside container..."
 	@$(COMPOSE) run --rm -e TESTS="$(TESTS)" testsuite ndcli
+
+test-all: test-dim test-pdns-output test-ndcli test-e2e  ## Run all test suites across all components
 
 ##@ Documentation
 
@@ -55,7 +68,8 @@ docs-serve: docs  ## Build and serve HTML documentation on http://localhost:8080
 
 testbed-start:  ## Start all local testbed containers in background (instant start, no slow rebuild)
 	@echo "==> Starting local DIM testbed in background..."
-	$(COMPOSE) up -d --remove-orphans mariadb pdns1 pdns2 dim-mw dim-output
+	@ids=$$(docker ps -aq --filter "name=dim-testsuite-testsuite-run"); if [ -n "$$ids" ]; then docker rm -f $$ids >/dev/null 2>&1; fi
+	$(COMPOSE) up -d --remove-orphans mariadb pdns1 pdns2 pdns-unit dim-mw dim-output
 	@echo ""
 	@echo "[OK] DIM Testbed is running!"
 	@echo "  • Run 'make testbed-shell' for interactive testbed shell (ndcli, dig)"
@@ -72,8 +86,7 @@ testbed-stop:  ## Stop local testbed and tear down containers
 	@echo "[OK] Testbed stopped and cleaned up."
 
 testbed-status:  ## Show status of testbed services and ports
-	@echo "==> Active testbed containers:"
-	@docker ps --filter "name=dim-testsuite" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+	@./dim-testsuite/docker/status.sh
 
 testbed-logs:  ## Follow live logs from DIM middleware and pdns-output daemon
 	@$(COMPOSE) logs -f dim-mw dim-output
@@ -100,10 +113,12 @@ restart-mw:  ## Restart dim-mw container to reload Python changes (1s)
 	@$(COMPOSE) restart dim-mw
 	@echo "[OK] dim-mw reloaded!"
 
-restart-output:  ## Restart dim-output container to reload Java changes (1s)
+restart-output:  ## Fast-reload pdns-output container with incremental Java build (~4s)
+	@echo "==> Incrementally compiling pdns-output..."
+	@cd pdns-output && ./gradlew shadowJar -x test -q
 	@echo "==> Restarting dim-output container..."
 	@$(COMPOSE) restart dim-output
-	@echo "[OK] dim-output reloaded!"
+	@echo "[OK] dim-output reloaded in ~4s with fresh Java build!"
 
 clean:  ## Clean temporary caches and test artifacts
 	rm -rf .pytest_cache dim/.pytest_cache ndcli/.pytest_cache dim-testsuite/.pytest_cache dim/doc/_build
