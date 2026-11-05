@@ -12,6 +12,7 @@ import org.xbill.DNS.Record;
 
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -178,5 +179,83 @@ public class IncrementalTest {
                 }
             }
         }
+    }
+
+    @Test
+    public void testUpdateSoaResignsRecord() throws Exception {
+        storage.createDomain(domain);
+        storage.setNSECParameters(domain, zsp.nsecParameters);
+        signer.signZone(domain, initialRecords, zsp);
+
+        // Initially valid
+        TestUtil.checkZone(storage, domain, pdns.conn);
+
+        // Update SOA content and re-sign SOA RRset
+        storage.updateSOA(domain, 86400, "ns1.web.de. hostmaster.web.de. 2016010199 28800 7200 604800 86400");
+        signer.signRRSet(domain, domain, Type.SOA, zsp);
+
+        // Zone must verify with 0 errors
+        TestUtil.checkZone(storage, domain, pdns.conn);
+    }
+
+    @Test
+    public void testIncrementalAddOnAgedZonePassesGatekeeper() throws Exception {
+        // Construct aged parameters: begin 8 days in past, end 6 days in future (~57% elapsed)
+        Date agedBegin = Date.from(Instant.now().minusSeconds(86400 * 8));
+        Date agedEnd = Date.from(Instant.now().plusSeconds(86400 * 6));
+        ZoneSignParameters agedZsp = new ZoneSignParameters(zsp.kskpairs, zsp.zskpairs, agedBegin, agedEnd, zsp.nsecParameters);
+
+        // Pre-validate with gatekeeper (must pass without exception)
+        DnssecGatekeeper.validateParameters(domain, agedZsp);
+
+        storage.createDomain(domain);
+        storage.setNSECParameters(domain, agedZsp.nsecParameters);
+        signer.signZone(domain, initialRecords, agedZsp);
+
+        // Initially valid
+        TestUtil.checkZone(storage, domain, pdns.conn);
+
+        // Incrementally add a new record using aged parameters
+        Record agedRecord = new ARecord(new Name("aged." + domain), DClass.IN, 86400, java.net.InetAddress.getByName("2.2.2.2"));
+        signer.incrementalAdd(domain, agedRecord, agedZsp);
+
+        // Zone must verify with 0 errors
+        TestUtil.checkZone(storage, domain, pdns.conn);
+    }
+
+    @Test
+    public void testIncrementalAddOnNearExpiredZonePassesGatekeeper() throws Exception {
+        // Construct near-expired parameters: begin 13 days in past, end 1 day in future (~93% elapsed)
+        Date nearExpiredBegin = Date.from(Instant.now().minusSeconds(86400 * 13));
+        Date nearExpiredEnd = Date.from(Instant.now().plusSeconds(86400 * 1));
+        ZoneSignParameters nearExpiredZsp = new ZoneSignParameters(zsp.kskpairs, zsp.zskpairs, nearExpiredBegin, nearExpiredEnd, zsp.nsecParameters);
+
+        // Pre-validate with gatekeeper (must pass cleanly)
+        DnssecGatekeeper.validateParameters(domain, nearExpiredZsp);
+
+        storage.createDomain(domain);
+        storage.setNSECParameters(domain, nearExpiredZsp.nsecParameters);
+        signer.signZone(domain, initialRecords, nearExpiredZsp);
+
+        // Verify initial state
+        TestUtil.checkZone(storage, domain, pdns.conn);
+
+        // Incrementally add a new record using near-expired parameters
+        Record record = new ARecord(new Name("near." + domain), DClass.IN, 86400, java.net.InetAddress.getByName("3.3.3.3"));
+        signer.incrementalAdd(domain, record, nearExpiredZsp);
+
+        // Zone must verify with 0 errors
+        TestUtil.checkZone(storage, domain, pdns.conn);
+    }
+
+    @Test(expected = SignatureRefusedException.class)
+    public void testIncrementalAddOnExpiredZoneThrowsSignatureRefused() throws Exception {
+        // Construct expired parameters: begin 15 days in past, end 1 day in past (already expired!)
+        Date expiredBegin = Date.from(Instant.now().minusSeconds(86400 * 15));
+        Date expiredEnd = Date.from(Instant.now().minusSeconds(86400 * 1));
+        ZoneSignParameters expiredZsp = new ZoneSignParameters(zsp.kskpairs, zsp.zskpairs, expiredBegin, expiredEnd, zsp.nsecParameters);
+
+        // Gatekeeper MUST throw SignatureRefusedException
+        DnssecGatekeeper.validateParameters(domain, expiredZsp);
     }
 }
