@@ -31,24 +31,48 @@ def set_user(username, type):
 
 
 @manage_dim.cli.command('update-validity')
+@click.argument('zone_name', required=False, default=None, metavar='[ZONE]')
+@click.option('-f', '--force', is_flag=True, help='Force renewal even if remaining validity is above threshold')
 @click.option('-v', '--verbose', is_flag=True, help='Print details about evaluated and renewed zones')
 @click.option('-n', '--dry-run', '--noop', 'dryrun', is_flag=True, help='Do not commit changes to the database')
-def update_validity(verbose=False, dryrun=False):
-    '''Check for signed zones with less than half of the validity window left and increase the validity period'''
+def update_validity(zone_name=None, force=False, verbose=False, dryrun=False):
+    '''Check for signed zones with less than half of the validity window left and increase the validity period.
+
+    Optionally targets a single ZONE, and supports --force to renew even if the zone is not yet due.
+
+    Args:
+        zone_name (str, optional): Target a specific zone by name. If not found or not signed, an error is raised.
+        force (bool): If True, forces renewal even if the validity window has > 50% remaining.
+        verbose (bool): Print details about evaluated and renewed zones.
+        dryrun (bool): Do not commit changes to the database or send updates.
+
+    Raises:
+        click.ClickException: If zone_name does not exist or is not DNSSEC-signed.
+    '''
     with current_app.test_request_context():
         g.tid = uuid.uuid4().hex[16:]
         now = datetime.datetime.utcnow()
-        all_zones = dim.models.Zone.query.all()
-        total_signed = 0
+
+        if zone_name is not None:
+            zone = dim.models.Zone.query.filter_by(name=zone_name).first()
+            if not zone:
+                raise click.ClickException(f"Zone '{zone_name}' does not exist.")
+            if not zone.is_signed():
+                raise click.ClickException(f"Zone '{zone_name}' is not signed.")
+            target_zones = [zone]
+            total_signed = 1
+            unsigned_count = 0
+        else:
+            all_zones = dim.models.Zone.query.all()
+            target_zones = [z for z in all_zones if z.is_signed()]
+            total_signed = len(target_zones)
+            unsigned_count = len(all_zones) - total_signed
+
         renewed_count = 0
         skipped_count = 0
         error_count = 0
 
-        for zone in all_zones:
-            if not zone.is_signed():
-                continue
-            total_signed += 1
-
+        for zone in target_zones:
             half_window = datetime.timedelta(seconds=zone.get_validity_window() / 2)
             reason = None
             if zone.valid_end is None or zone.valid_begin is None:
@@ -57,6 +81,8 @@ def update_validity(verbose=False, dryrun=False):
                 reason = "corrupted timestamps (valid_end <= valid_begin)"
             elif zone.valid_end <= now + half_window:
                 reason = "remaining validity <= 50% of window"
+            elif force:
+                reason = "forced renewal (--force)"
 
             if reason:
                 try:
@@ -69,7 +95,7 @@ def update_validity(verbose=False, dryrun=False):
                     else:
                         dim.models.OutputUpdate.send_dnssec_update(zone, '')
                     renewed_count += 1
-                    if verbose:
+                    if verbose or zone_name is not None:
                         begin_str = zone.valid_begin.strftime('%Y-%m-%d %H:%M:%SZ') if zone.valid_begin else ''
                         end_str = zone.valid_end.strftime('%Y-%m-%d %H:%M:%SZ') if zone.valid_end else ''
                         click.secho(
@@ -86,7 +112,7 @@ def update_validity(verbose=False, dryrun=False):
                     raise
             else:
                 skipped_count += 1
-                if verbose:
+                if verbose or zone_name is not None:
                     end_dt = zone.valid_end
                     remaining = (end_dt - now).total_seconds() / 86400 if end_dt else 0.0
                     half_days = half_window.total_seconds() / 86400
@@ -104,13 +130,20 @@ def update_validity(verbose=False, dryrun=False):
             dim.models.db.session.commit()
 
         # Summary output
-        unsigned_count = len(all_zones) - total_signed
-        click.echo(
-            f"\nSummary: Evaluated {total_signed} signed zones ({unsigned_count} unsigned skipped):\n"
-            f"  - Queued for pdns-output: {renewed_count}\n"
-            f"  - Up-to-date (skipped):   {skipped_count}\n"
-            f"  - Errors:                 {error_count}"
-        )
+        if zone_name is not None:
+            click.echo(
+                f"\nSummary: Evaluated zone '{zone_name}':\n"
+                f"  - Queued for pdns-output: {renewed_count}\n"
+                f"  - Up-to-date (skipped):   {skipped_count}\n"
+                f"  - Errors:                 {error_count}"
+            )
+        else:
+            click.echo(
+                f"\nSummary: Evaluated {total_signed} signed zones ({unsigned_count} unsigned skipped):\n"
+                f"  - Queued for pdns-output: {renewed_count}\n"
+                f"  - Up-to-date (skipped):   {skipped_count}\n"
+                f"  - Errors:                 {error_count}"
+            )
         if renewed_count > 0 and not dryrun:
             click.secho(
                 "Notice: Validity renewed in DIM database and queued in outputupdate table. "
