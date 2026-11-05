@@ -65,13 +65,30 @@ run_pytest() {
     fi
 }
 
+run_e2e_scenarios() {
+    echo "### running e2e test scenarios from e2e/"
+    local rc=0
+    for scenario in /src/dim-testsuite/e2e/*.sh; do
+        if [ -x "$scenario" ]; then
+            echo "===> Running E2E scenario: $(basename "$scenario")"
+            "$scenario" || rc=1
+        fi
+    done
+    return $rc
+}
+
 run_ndcli() {
     echo "### running the ndcli suite"
     # TESTS empty means all tests in t/
     # runtest.py reads ndcli's stdout and stderr from one pipe and the expected
     # outputs in t/ rely on stdout being block buffered (flushed at exit, after
     # the log messages on stderr)
-    env -u PYTHONUNBUFFERED make test TESTS="${TESTS:-}"
+    local rc=0
+    env -u PYTHONUNBUFFERED make test TESTS="${TESTS:-}" || rc=1
+    if [ -z "${TESTS:-}" ]; then
+        run_e2e_scenarios || rc=1
+    fi
+    return $rc
 }
 
 # everything dnssec: the unit and rpc tests, the zone signing done by
@@ -90,7 +107,7 @@ run_dnssec() {
     tests+=" zone-nsec3-attrs.t history-zone-dnssec.t rr-create-ds-1.t"
     env -u PYTHONUNBUFFERED make test TESTS="$tests" || rc=1
     echo "### signing and validating zones with drill and jdnssec-verifyzone"
-    docker/dnssec-check.sh || rc=1
+    /src/dim-testsuite/e2e/dnssec-check.sh || rc=1
     return $rc
 }
 
@@ -116,7 +133,7 @@ case "${1:-all}" in
         run_dnssec
         ;;
     dnssec-diff)
-        exec docker/dnssec-diff.sh
+        exec /src/dim-testsuite/e2e/dnssec-diff.sh
         ;;
     shell)
         exec /src/dim-testsuite/docker/testbed-shell.sh
@@ -127,6 +144,8 @@ case "${1:-all}" in
             make db
 
             echo "### starting dim middleware API on port 5000"
+            fuser -k 5000/tcp >/dev/null 2>&1 || true
+            sleep 0.5
             FLASK_APP='dim:create_app(db_mode="TEST")' flask run --host=0.0.0.0 --port=5000 &
             FLASK_PID=$!
 
@@ -139,6 +158,8 @@ case "${1:-all}" in
             ndcli modify output out add zone-group zg >/dev/null 2>&1 || true
         else
             echo "### starting dim middleware API on port 5000 (existing database)"
+            fuser -k 5000/tcp >/dev/null 2>&1 || true
+            sleep 0.5
             FLASK_APP='dim:create_app(db_mode="TEST")' flask run --host=0.0.0.0 --port=5000 &
             FLASK_PID=$!
             wait_for "DIM Middleware API" "echo > /dev/tcp/localhost/5000"
@@ -150,8 +171,16 @@ case "${1:-all}" in
         ;;
     output)
         wait_for "DIM Middleware API" "echo > /dev/tcp/localhost/5000"
+        JAR="/opt/dim/pdns-output.jar"
+        LOCAL_JAR=$(ls /src/pdns-output/pdns-output/build/libs/*-all.jar 2>/dev/null | tail -1 || true)
+        if [ -n "$LOCAL_JAR" ] && [ -f "$LOCAL_JAR" ]; then
+            echo "### [Live-Reload] Using freshly built jar from mount: $LOCAL_JAR"
+            JAR="$LOCAL_JAR"
+        else
+            echo "### Using standard baked-in jar: $JAR"
+        fi
         echo "### starting pdns-output daemon"
-        exec java -jar /opt/dim/pdns-output.jar --config tests/pdns-output-test.properties
+        exec java -jar "$JAR" --config tests/pdns-output-test.properties
         ;;
     *)
         exec "$@"
