@@ -50,15 +50,19 @@ make testbed-start  # Start MariaDB, PowerDNS 1 & 2, dim-mw, and dim-output in b
 make testbed-build  # Rebuild testbed container images from scratch (only on Dockerfile/dep changes)
 make testbed-shell  # Open interactive shell (ndcli pre-authenticated, tab-completion, dig @127.1.1.1)
 make testbed-seed   # Populate testbed with demo zone (test.example.com) and sample records
-make testbed-test   # Run E2E CLI scenario tests (t/*.t) against testbed
+make testbed-status # Show health and status of all testbed services
 make testbed-logs   # Follow live logs from middleware and pdns-output daemon
 make shell-pdns     # Open PowerDNS authoritative nameserver shell
 make restart-mw     # Fast-reload dim-mw container after editing Python code (1s)
-make restart-output # Fast-reload dim-output container after editing Java code (1s)
+make restart-output # Fast-reload dim-output container with incremental Java build (~4s)
 make docs           # Build Sphinx HTML documentation inside container
 make docs-serve     # Build and serve HTML docs on http://localhost:8080
-make test           # Run pytest unit/integration test suite (fast, ~15s)
-make check          # Run syntax validation and containerized unit tests
+make test-dim       # Run DIM middleware pytest suite in container (optional: PYTESTS="expression")
+make test-ndcli     # Run ndcli CLI unit tests (cliparse_test.py)
+make test-pdns-output # Run pdns-output Java test suite
+make test-e2e       # Run E2E CLI scenario tests (t/*.t) & e2e/*.sh in container
+make test-all       # Run all test suites across all components
+make check          # Run syntax validation and fast unit test suites (DIM + ndcli)
 make testbed-stop   # Stop and tear down all testbed containers
 ```
 
@@ -73,11 +77,15 @@ make testbed-stop   # Stop and tear down all testbed containers
 
 ### Running Individual Tests
 - **Python Pytest (Unit / Integration Tests):**
-  - From host: `make test` (or `make test PYTESTS="update_validity"`)
+  - From host: `make test-dim` (or `make test-dim PYTESTS="update_validity"`)
   - Inside `make testbed-shell`: `pytest tests/update_validity_test.py`
 - **CLI / Scenario Tests (E2E Tests in `t/*.t`):**
-  - From host: `make testbed-test` (or `make testbed-test TESTS="zone-dnssec-attrs.t"`)
+  - From host: `make test-e2e` (or `make test-e2e TESTS="zone-dnssec-attrs.t"`)
   - Inside `make testbed-shell`: `make test TESTS=zone-dnssec-attrs.t`
+- **ndcli CLI Unit Tests:**
+  - From host: `make test-ndcli`
+- **pdns-output Tests:**
+  - From host: `make test-pdns-output` (requires active testbed)
 
 ### Safety Guarantee: Production DIM is Never Touched
 * The testbed runs in a completely isolated Docker network namespace.
