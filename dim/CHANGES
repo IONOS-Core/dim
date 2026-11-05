@@ -1,5 +1,6 @@
 to be released
 ------
+* add optional zone argument and --force option to manage_dim update-validity for targeted and forced signature renewals
 * backdate DNSSEC signature inception by 1 hour (RFC 6781) and introduce configurable dnssec_validity_skew zone attribute
 * add --verbose and --dry-run options to manage_dim update-validity and improve queue status output
 * fix update-validity not publishing the renewed signature validity of NSEC (non-NSEC3) zones to the outputs, which let their RRSIGs expire
