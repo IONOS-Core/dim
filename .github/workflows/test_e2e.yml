@@ -1,0 +1,32 @@
+name: E2E Scenario Tests
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/test_e2e.yml'
+      - 'dim/**'
+      - 'ndcli/**'
+      - 'dimclient/**'
+      - 'dim-testsuite/**'
+      - 'pdns-output/**'
+      - 'Makefile'
+  push:
+    paths:
+      - '.github/workflows/test_e2e.yml'
+      - 'dim/**'
+      - 'ndcli/**'
+      - 'dimclient/**'
+      - 'dim-testsuite/**'
+      - 'pdns-output/**'
+      - 'Makefile'
+
+jobs:
+  test_e2e:
+    name: Full Testbed E2E & Scenarios (Docker Compose)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Run E2E testbed scenario tests
+        run: make test-e2e

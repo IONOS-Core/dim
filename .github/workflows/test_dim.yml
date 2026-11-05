@@ -1,25 +1,24 @@
-# run tests
-name: run_tests
+name: DIM Middleware Tests
+
 on:
   pull_request:
     paths:
-      - '.github/workflows/**'
       - 'dim/**'
-      - 'ndcli/**'
       - 'dimclient/**'
       - 'dim-testsuite/**'
+      - '.github/workflows/test_dim.yml'
       - 'Makefile'
   push:
     paths:
-      - '.github/workflows/**'
       - 'dim/**'
-      - 'ndcli/**'
       - 'dimclient/**'
       - 'dim-testsuite/**'
+      - '.github/workflows/test_dim.yml'
       - 'Makefile'
 
 jobs:
-  pytest_dim:
+  test_dim:
+    name: DIM Pytest Suite (Oracle Linux 9)
     runs-on: ubuntu-latest
     container:
       image: oraclelinux:9
@@ -37,15 +36,20 @@ jobs:
         run: |
           /bin/dnf install --assumeyes dnf-plugins-core
           /bin/dnf config-manager --set-enabled ol9_codeready_builder
+
       - name: Install dependencies
         run: /bin/dnf install --assumeyes gcc python3-devel mariadb-devel git python3 make tar gzip
+
       - name: Check out repository code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
+
       - name: Prepare virtual environment
         run: make install-test
         working-directory: dim-testsuite
+
       - name: Create DIM configuration directory
         run: mkdir -p /etc/dim
+
       - name: Create DIM configuration
         shell: sh
         run: |
@@ -71,6 +75,7 @@ jobs:
           DEBUG = False
           SQLALCHEMY_LOG = False
           EOF
+
       - name: Initialize Database
         run: make db-clear
         working-directory: dim-testsuite
@@ -79,14 +84,7 @@ jobs:
           PDNS1_DB_PORT: 3306
           PDNS2_DB_SERVER: mariadb
           PDNS2_DB_PORT: 3306
+
       - name: Run pytests
         run: make pytest
         working-directory: dim-testsuite
-
-  testbed_e2e:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v4
-      - name: Run E2E testbed scenario tests
-        run: make testbed-test
