@@ -1,5 +1,5 @@
-to be released
---------------
+5.0.4-rc0
+---------
 * implement pre-publishing DNSSEC signature gatekeeper to refuse future-dated or expired signatures before modifying PowerDNS (RFC 6781)
 * fix silent fallback in OutputUpdate that allowed inserting plain unsigned records into DNSSEC-signed zones when signing parameters could not be retrieved
 * re-sign SOA RRset with valid RRSIG when UPDATE_SOA is applied to DNSSEC-signed zones
