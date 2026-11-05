@@ -6,7 +6,7 @@ plugins {
 }
 
 group = 'dim'
-version = '5.0.3'
+version = '5.0.4-rc0'
 
 application {
     mainClass = 'dim.PdnsOutput'
