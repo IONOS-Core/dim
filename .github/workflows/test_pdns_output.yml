@@ -1,17 +1,18 @@
-name: Java Tests (pdns-output)
+name: pdns-output Java Tests
 
 on:
   push:
     paths:
       - 'pdns-output/**'
-      - '.github/workflows/run_java_tests.yml'
+      - '.github/workflows/test_pdns_output.yml'
   pull_request:
     paths:
       - 'pdns-output/**'
-      - '.github/workflows/run_java_tests.yml'
+      - '.github/workflows/test_pdns_output.yml'
 
 jobs:
-  test:
+  test_pdns_output:
+    name: pdns-output Gradle Suite (Java 21)
     runs-on: ubuntu-latest
 
     services:
@@ -24,7 +25,8 @@ jobs:
         options: --health-cmd="mysqladmin ping" --health-interval=5s --health-timeout=2s --health-retries=10
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repository code
+        uses: actions/checkout@v4
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -63,4 +65,4 @@ jobs:
 
       - name: Print PowerDNS log on failure
         if: failure()
-        run: docker logs pdns-unit 2>&1 || true
+        run: docker logs pdns-unit 2>&1 || echo "PowerDNS logs for pdns-unit unavailable"

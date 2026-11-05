@@ -1,0 +1,40 @@
+name: ndcli Tests
+
+on:
+  pull_request:
+    paths:
+      - 'ndcli/**'
+      - 'dimclient/**'
+      - '.github/workflows/test_ndcli.yml'
+      - 'Makefile'
+  push:
+    paths:
+      - 'ndcli/**'
+      - 'dimclient/**'
+      - '.github/workflows/test_ndcli.yml'
+      - 'Makefile'
+
+jobs:
+  test_ndcli:
+    name: ndcli Unit Tests (Oracle Linux 9)
+    runs-on: ubuntu-latest
+    container:
+      image: oraclelinux:9
+    steps:
+      - name: Install dependencies
+        run: /bin/dnf install --assumeyes git python3 python3-pip python3-devel make
+
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Install ndcli dependencies
+        run: |
+          pip3 install pytest pytest-mock
+          pip3 install -r ndcli/requirements.txt
+          pip3 install -e dimclient
+          pip3 install -e ndcli
+
+      - name: Run ndcli unit tests
+        env:
+          PYTHONPATH: "dimclient:ndcli"
+        run: make test-ndcli
