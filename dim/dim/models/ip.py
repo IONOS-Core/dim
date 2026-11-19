@@ -5,7 +5,7 @@ import re
 from sqlalchemy import Column, BigInteger, Integer, String, Numeric, TIMESTAMP, ForeignKey, UniqueConstraint
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import relationship, backref, validates, synonym
-from sqlalchemy.sql import bindparam, or_, between, func, expression, text
+from sqlalchemy.sql import bindparam, or_, between, func, expression, false, text
 from sqlalchemy.types import DateTime
 
 from dim import db
@@ -432,10 +432,8 @@ class Ipblock(db.Model, WithAttr, TrackChanges):
     def _tree_update(self):
         db.session.flush()      # we need self.id
         logging.debug('Updating tree for %s', self)
-        new_parent_id = None
-        if self.ip.prefix !=0:
-            ancestors = Ipblock._ancestors_noparent(self.ip, self.layer3domain)
-            new_parent_id = ancestors[0].id if ancestors else None
+        ancestors = Ipblock._ancestors_noparent(self.ip, self.layer3domain)
+        new_parent_id = ancestors[0].id if ancestors else None
         if self.parent_id != new_parent_id:
             self.parent_id = new_parent_id
         if not self.is_host:
@@ -504,10 +502,16 @@ class Ipblock(db.Model, WithAttr, TrackChanges):
 
     @staticmethod
     def _ancestors_noparent_condition(ip, include_self=False):
+        prefixes = range(ip.prefix + (1 if include_self else 0))
+        if not prefixes:
+            # A /0 has nothing above it, so the disjunction below is empty --
+            # which is false, not the syntactically broken '()' this used to
+            # emit. Callers get an empty result set, which is the right answer.
+            return false()
         # use raw sql because sqlalchemy is slow at building large queries
         f = " OR ".join(('address=%d AND prefix=%d' %
                          (ip.address & ((2 ** ip.bits - 1) ^ (2 ** (ip.bits - prefix) - 1)), prefix)
-                         for prefix in range(ip.prefix + (1 if include_self else 0))))
+                         for prefix in prefixes))
         return text('(' + f + ')')
 
     @staticmethod
