@@ -105,7 +105,7 @@ internal.test.  86400 IN NS ins2.internal.test.
 
 ### Setup your IP Space - Containers
 
-You manage your IP-Space in DIM with the following objects: `containers`, `pools` and `subnets`. For a minimal layer 2 Management you can tag your pools with `vlan` information.
+You manage your IP-Space in DIM with the following objects: `containers`, `pools` and `subnets`. How these compare to the RFC and RIPE terms (aggregate, prefix, subnet, allocation, assignment) is described in [dim/doc/terminology.rst](dim/doc/terminology.rst). For a minimal layer 2 Management you can tag your pools with `vlan` information.
 
 For an enterprise environment where you have several v4 /16 and v6 /32 aggregates to manage, you typically add these directly as containers.
 

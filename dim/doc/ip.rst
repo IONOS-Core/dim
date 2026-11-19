@@ -11,6 +11,9 @@ individual node from this tree is called Ipblock (or simply block) and it
 represents a CIDR-like block of IP addresses (ex: ``10.0.0.0/8``). The children
 Ipblocks represent a subset of the parent address space.
 
+How these terms relate to the RFC and RIPE vocabulary network engineers use
+is described in :ref:`terminology`.
+
 Each block can have a status value associated. The most interesting status
 values are:
 
