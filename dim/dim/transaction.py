@@ -71,7 +71,11 @@ def get_lock_for_transaction(lock_name, timeout):
 def retryable_transaction(f):
     """Retry a function when deadlocky exceptions are raised"""
     attempts = 3
-    lock_messages_error = ['Deadlock found', 'Lock wait timeout exceeded']
+    lock_messages_error = [
+        "deadlock found",
+        "lock wait timeout exceeded",
+        "try restarting transaction",
+    ]
 
     @wraps(f)
     def wrapped(*args, **kwargs):
@@ -82,9 +86,16 @@ def retryable_transaction(f):
             try:
                 return f(*args, **kwargs)
             except OperationalError as e:
-                if i == (attempts - 1) or all(msg not in e.message for msg in lock_messages_error):
+                error_msg = str(e).lower()
+                if i == (attempts - 1) or all(
+                    msg not in error_msg for msg in lock_messages_error
+                ):
+                    Messages.restore()
                     raise
                 logging.info('Error processing transaction: %s. Retrying', e)
+            except Exception:
+                Messages.restore()
+                raise
     return wrapped
 
 
