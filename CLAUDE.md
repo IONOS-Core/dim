@@ -128,12 +128,58 @@ make testbed-stop    # Stop and clean up testbed containers
   - From host: `make test-dim` (or `make test-dim PYTESTS="update_validity"`)
   - Inside `make testbed-shell`: `pytest tests/update_validity_test.py`
 - **CLI / Scenario Tests (E2E Tests in `t/*.t`):**
-  - From host: `make test-e2e` (or `make test-e2e TESTS="zone-dnssec-attrs.t"`) — *requires clean environment; aborts if testbed is running (`make testbed-stop`)*
   - Inside `make testbed-shell`: `make test TESTS=zone-dnssec-attrs.t`
+- **Live Stack E2E Test Suite (`dim-testsuite/e2e/suites/`):**
+  - Run full suite against testbed: `make test-e2e`
+  - Run specific domain filter: `make test-e2e SUITE="dnssec"` (or `SUITE="zone"`, `SUITE="ipam"`)
 - **ndcli CLI Unit Tests:**
   - From host: `make test-ndcli`
 - **pdns-output Tests:**
   - From host: `make test-pdns-output` (requires active testbed)
+
+## End-to-End (E2E) Test Architecture
+
+Live E2E tests reside in `dim-testsuite/e2e/suites/` and are orchestrated by `dim-testsuite/e2e/run-all.sh`.
+
+### Naming Conventions:
+All E2E test scripts must follow the domain pattern:
+`test-<domain>-<feature>.sh`
+- `records`: Resource record syntax, validation, RFC constraints (e.g. `test-records-all-types.sh`, `test-records-rfc7505-null-mx.sh`).
+- `zone`: Zone, view, and subzone lifecycle (e.g. `test-zone-bulk-views.sh`, `test-zone-profile-inheritance.sh`).
+- `dnssec`: Cryptographic signing, inceptions, key rollover, NSEC3 params (e.g. `test-dnssec-inception.sh`, `test-dnssec-key-rollover.sh`).
+- `ipam`: Subnet, pool, delegation, and reverse DNS logic (e.g. `test-ipam-pool-depletion.sh`, `test-ipam-reverse-rfc2317.sh`).
+- `core`: Infrastructure guarantees, dry-run, user permissions (e.g. `test-core-dryrun-guarantee.sh`, `test-core-user-rights.sh`).
+
+### Assertion Library & Output Standards (`test-lib.sh`):
+Tests source `test-lib.sh` and must use standardized assertion functions:
+- `assert_equals <label> <expected> <actual> [<type_tag>]`
+- `assert_contains <label> <needle> <haystack>`
+- `assert_exit_code <label> <expected_code> <actual_code> [<output>]`
+- `assert_not_empty <label> <actual> [<type_tag>]`
+
+**Output Rule:** All test logging, assertion labels, and failure outputs MUST be strictly in **English**:
+```text
+  [FAIL] Assertion Failed: Label
+         Expected [Type] : <expected>
+         Received [Type] : <actual>
+```
+
+### CLI Option Conventions (Best Practice):
+In test scripts, automation, CI/CD, and documentation, **always prefer long option flags** for clarity and maintainability:
+- Use `--cleanup` instead of `-c`
+- Use `--dryrun` instead of `-n`
+- Use `--quiet` instead of `-q`
+- Use `--view` instead of `-v`
+Short single-letter flags are reserved for human interactive shell use.
+
+### Defect Protocol (When a Bug is Found):
+1. **Failing Test First:** Write an E2E test asserting the expected/RFC behavior so it fails deterministically while the bug is present.
+2. **Lean Test Code:** Keep comments inside test scripts minimal (only concise purpose headers). Let `assert_*` outputs speak for themselves.
+3. **Document Root Cause:** Document the full bug analysis in the pull request description or issue tracker (exact file:line, code snippet, root cause, reproduction command, and proposed fix).
+
+## Development Setup & Diff-Linting
+- Install tools and configure Git hooks: `make install-dev`
+- Run diff-based linting on changed files: `make lint` (runs `shellcheck` on modified `.sh`, `darker`/`ruff` on modified `.py`, `compileJava` on modified `.java`).
 
 ### Shell Environments & Log Locations
 | Command | Container | Role | CLI Tools | Log Location |

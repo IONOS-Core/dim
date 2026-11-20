@@ -117,3 +117,15 @@ You can add new users with openldap or use below users to interact with dim
 | john3   | P@ssw0rd |
 | john2   | P@ssw0rd |
 | john1   | P@ssw0rd |
+
+## Development
+
+```sh
+make help          # View all available targets
+make install-dev   # Install dev tools and configure Git hooks
+make lint          # Run diff-based linting on modified files (shellcheck, darker, ruff)
+make check         # Run syntax validation and unit tests
+make testbed-start # Start local Docker testbed
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
