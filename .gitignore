@@ -10,3 +10,9 @@ dim/dist
 dimclient/dist
 ndcli/dist
 dim-testsuite/baseline
+
+# Local notes, work-in-progress task lists & credentials (prevent internal leaks)
+TODO*.md
+*.local
+*.creds
+

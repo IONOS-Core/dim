@@ -1,4 +1,4 @@
-name: E2E Scenario Tests
+name: E2E & Scenario Tests
 
 on:
   pull_request:
@@ -21,12 +21,29 @@ on:
       - 'Makefile'
 
 jobs:
-  test_e2e:
-    name: Full Testbed E2E & Scenarios (Docker Compose)
+  test_scenarios:
+    name: Scenario Tests (t/*.t)
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
 
+      - name: Run scenario tests (t/*.t)
+        run: make test-scenarios
+
+  test_e2e:
+    name: Live Testbed E2E Suites
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Start DIM testbed
+        run: make testbed-start
+
       - name: Run E2E testbed scenario tests
         run: make test-e2e
+
+      - name: Stop DIM testbed
+        if: always()
+        run: make testbed-stop
