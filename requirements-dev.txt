@@ -1,0 +1,5 @@
+-r dim/requirements-dev.txt
+-r ndcli/requirements-dev.txt
+darker>=2.1.0
+ruff>=0.4.0
+black>=24.0.0

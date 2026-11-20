@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+#
+# .githooks/pre-commit - Run diff-based linting on staged changes
+#
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+exec "${SCRIPT_DIR}/scripts/lint-diff.sh" --staged
