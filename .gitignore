@@ -16,3 +16,22 @@ TODO*.md
 *.local
 *.creds
 
+# Database dumps, backups & temporary test data
+*.dump
+*.dump.*
+*.sql.gz
+*.sql.bz2
+*.sql.xz
+*.sql.zst
+*.sql.tar*
+*.sqlite
+*.sqlite3
+*.db
+dumps/
+data/dumps/
+*.sql
+!dim/pdns.sql
+!dim-testsuite/testenv/pdns.sql
+!dim/dim/sql/*.sql
+!docker/conf/mysql/*.sql
+

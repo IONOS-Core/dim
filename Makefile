@@ -1,4 +1,4 @@
-.PHONY: help check lint install-dev test-dim test-pdns-output test-ndcli test-e2e test-scenarios test-all docs docs-serve testbed-start testbed-build testbed-stop testbed-status testbed-seed testbed-shell testbed-logs shell-output shell-pdns restart-mw restart-output clean
+.PHONY: help check lint install-dev test-dim test-pdns-output test-ndcli test-e2e test-scenarios test-all docs docs-serve testbed-start testbed-build testbed-stop testbed-status testbed-seed testbed-import-db testbed-shell testbed-logs shell-output shell-pdns restart-mw restart-output clean
 .DEFAULT_GOAL := help
 
 COMPOSE ?= docker compose -f dim-testsuite/compose.yaml
@@ -117,6 +117,9 @@ testbed-logs:  ## Follow live logs from DIM middleware and pdns-output daemon
 testbed-seed:  ## Populate testbed with demo zone (test.example.com) and sample records
 	@echo "==> Seeding testbed data..."
 	@$(COMPOSE) exec dim-mw /src/dim-testsuite/docker/seed.sh
+
+testbed-import-db:  ## Import database SQL dump(s) into testbed (DIR=... or DIM_DUMP=... PDNS1_DUMP=...)
+	@./dim-testsuite/docker/import-db.sh $(if $(DIR),--dir "$(DIR)") $(if $(DIM_DUMP),--dim "$(DIM_DUMP)") $(if $(PDNS1_DUMP),--pdns1 "$(PDNS1_DUMP)") $(if $(PDNS2_DUMP),--pdns2 "$(PDNS2_DUMP)")
 
 ##@ Container Shells
 
