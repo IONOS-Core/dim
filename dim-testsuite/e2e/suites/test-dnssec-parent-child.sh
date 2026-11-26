@@ -15,36 +15,34 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../test-lib.sh"
 setup_env
 
-PARENT="trust-parent.com"
-CHILD="secure-child.${PARENT}"
 
 step "Clean up previous runs"
-delete_zone_all_views "$CHILD"
-delete_zone_all_views "$PARENT"
+delete_zone_all_views secure-child.trust-parent.com
+delete_zone_all_views trust-parent.com
 
-step "Create DNSSEC-signed parent zone: $PARENT"
-ndcli create zone "$PARENT"
-ensure_output_sync "$PARENT"
-ndcli modify zone "$PARENT" dnssec enable 8 ksk 2048 zsk 1024
+step "Create DNSSEC-signed parent zone: trust-parent.com"
+ndcli create zone trust-parent.com
+ensure_output_sync trust-parent.com
+ndcli modify zone trust-parent.com dnssec enable 8 ksk 2048 zsk 1024
 
-step "Create DNSSEC-signed child zone: $CHILD"
-ndcli create zone "$CHILD"
-ensure_output_sync "$CHILD"
-ndcli modify zone "$CHILD" dnssec enable 8 ksk 2048 zsk 1024
+step "Create DNSSEC-signed child zone: secure-child.trust-parent.com"
+ndcli create zone secure-child.trust-parent.com
+ensure_output_sync secure-child.trust-parent.com
+ndcli modify zone secure-child.trust-parent.com dnssec enable 8 ksk 2048 zsk 1024
 
 step "Verify DS record was automatically created in parent zone"
-DS_COUNT_PARENT=$(ndcli list rrs "${CHILD}." DS -H | wc -l)
-echo "  DS records found for ${CHILD} in parent: $DS_COUNT_PARENT"
+DS_COUNT_PARENT=$(ndcli list rrs "secure-child.trust-parent.com." DS -H | wc -l)
+echo "  DS records found for secure-child.trust-parent.com in parent: $DS_COUNT_PARENT"
 
 if [ "$DS_COUNT_PARENT" -lt 1 ]; then
-    log_fail "No DS record was created in parent zone $PARENT for child $CHILD!"
+    log_fail "No DS record was created in parent zone trust-parent.com for child secure-child.trust-parent.com!"
 fi
-log_pass "DS record automatically generated in parent zone $PARENT."
+log_pass "DS record automatically generated in parent zone trust-parent.com."
 
 step "Wait for PowerDNS to receive parent zone with child DS record"
 SYNCED=false
 for _ in $(seq 1 20); do
-    if dig "@${PDNS_ADDRESS:-127.1.1.1}" "${CHILD}." DS +noall +answer | grep -q "IN.*DS"; then
+    if dig "@${PDNS_ADDRESS:-127.1.1.1}" "secure-child.trust-parent.com." DS +noall +answer | grep -q "IN.*DS"; then
         SYNCED=true
         break
     fi
@@ -52,14 +50,14 @@ for _ in $(seq 1 20); do
 done
 
 if [ "$SYNCED" = false ]; then
-    log_fail "PowerDNS did not receive DS record for ${CHILD} in parent zone."
+    log_fail "PowerDNS did not receive DS record for secure-child.trust-parent.com in parent zone."
 fi
-log_pass "PowerDNS authoritative server serves valid DS delegation for ${CHILD}."
+log_pass "PowerDNS authoritative server serves valid DS delegation for secure-child.trust-parent.com."
 
 step "Decommission child zone and verify DS record removal from parent"
-delete_zone_all_views "$CHILD"
+delete_zone_all_views secure-child.trust-parent.com
 
-DS_COUNT_AFTER=$(ndcli list rrs "${CHILD}." DS -H 2>/dev/null | wc -l)
+DS_COUNT_AFTER=$(ndcli list rrs "secure-child.trust-parent.com." DS -H 2>/dev/null | wc -l)
 echo "  DS records remaining in parent after child zone delete: $DS_COUNT_AFTER"
 
 if [ "$DS_COUNT_AFTER" -gt 0 ]; then
@@ -68,6 +66,6 @@ fi
 log_pass "DS delegation cleanly purged from parent zone upon child deletion."
 
 step "Cleanup"
-delete_zone_all_views "$PARENT"
+delete_zone_all_views trust-parent.com
 
 log_pass "Test dnssec-parent-child completed successfully."

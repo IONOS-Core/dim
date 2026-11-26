@@ -10,10 +10,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../test-lib.sh"
 setup_env
 
-ZONE="v6-special-scopes.com"
 
 cleanup_v6_special() {
-    delete_zone_all_views "$ZONE"
+    delete_zone_all_views v6-special-scopes.com
     ndcli -q delete container "fe80::/10" 2>/dev/null || true
     ndcli -q delete container "ff00::/8" 2>/dev/null || true
 }
@@ -41,24 +40,24 @@ CONTAINER_MC=$(ndcli show container "ff00::/8" | grep '^status:' | cut -d':' -f2
 assert_equals "Multicast container status" "Container" "$CONTAINER_MC" "Status"
 
 step "Test 3: Create AAAA records with link-local and multicast addresses in zone"
-ndcli --quiet create zone "$ZONE"
-ensure_output_sync "$ZONE"
+ndcli --quiet create zone v6-special-scopes.com
+ensure_output_sync v6-special-scopes.com
 
-ndcli --quiet create rr "llocal.${ZONE}." AAAA "fe80::1"
-ndcli --quiet create rr "allnodes.${ZONE}." AAAA "ff02::1"
+ndcli --quiet create rr "llocal.v6-special-scopes.com." AAAA "fe80::1"
+ndcli --quiet create rr "allnodes.v6-special-scopes.com." AAAA "ff02::1"
 
 # Verify records exist in DIM
-LL_IP=$(ndcli list rrs "llocal.${ZONE}." AAAA -H | awk '{print $5}')
+LL_IP=$(ndcli list rrs "llocal.v6-special-scopes.com." AAAA -H | awk '{print $5}')
 assert_equals "Link-local AAAA record created" "fe80::1" "$LL_IP" "IPv6 Address"
 
-MC_IP=$(ndcli list rrs "allnodes.${ZONE}." AAAA -H | awk '{print $5}')
+MC_IP=$(ndcli list rrs "allnodes.v6-special-scopes.com." AAAA -H | awk '{print $5}')
 assert_equals "Multicast AAAA record created" "ff02::1" "$MC_IP" "IPv6 Address"
 
 step "Wait for PowerDNS to receive special-scope AAAA records"
 SYNCED=false
 for _ in $(seq 1 20); do
-    PDNS_LL=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "llocal.${ZONE}." AAAA +short || true)
-    PDNS_MC=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "allnodes.${ZONE}." AAAA +short || true)
+    PDNS_LL=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "llocal.v6-special-scopes.com." AAAA +short || true)
+    PDNS_MC=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "allnodes.v6-special-scopes.com." AAAA +short || true)
     if [ "$PDNS_LL" = "fe80::1" ] && [ "$PDNS_MC" = "ff02::1" ]; then
         SYNCED=true
         break

@@ -29,7 +29,7 @@ DIM strictly separates the **Local Testbed** (Inner Dev-Loop) from the **CI Pipe
   * `test_ndcli.yml`: ndcli unit tests in a clean Oracle Linux 9 container.
   * `test_dim.yml`: DIM middleware pytests with a clean MariaDB service container.
   * `test_pdns_output.yml`: pdns-output Gradle suite with JDK 21, MariaDB, and PowerDNS.
-  * `test_e2e.yml`: Full regression testbed runner executing all 203 scenario tests (`t/*.t`) and all shell scenarios (`dim-testsuite/e2e/*.sh`).
+  * `test_e2e.yml`: Full regression testbed runner executing all scenario tests (`t/*.t`) and all shell scenarios (`dim-testsuite/e2e/*.sh`).
 
 ## Architecture Components
 - `dim/`: Core Python middleware (Flask REST and JSON-RPC API, SQLAlchemy models, MySQL/MariaDB database).

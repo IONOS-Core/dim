@@ -10,29 +10,25 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../test-lib.sh"
 setup_env
 
-ZONE="case-canonical-test.com"
-LOWER_HOST="myhost.${ZONE}."
-UPPER_HOST="MYHOST.${ZONE}."
-MIXED_HOST="MyHost.${ZONE}."
 
 cleanup_case() {
-    delete_zone_all_views "$ZONE"
+    delete_zone_all_views case-canonical-test.com
 }
 
 step "Clean up previous runs"
 cleanup_case
 
 step "Create DNSSEC-enabled zone"
-ndcli --quiet create zone "$ZONE"
-ensure_output_sync "$ZONE"
-ndcli --quiet modify zone "$ZONE" dnssec enable 8 ksk 2048 zsk 1024
+ndcli --quiet create zone case-canonical-test.com
+ensure_output_sync case-canonical-test.com
+ndcli --quiet modify zone case-canonical-test.com dnssec enable 8 ksk 2048 zsk 1024
 
 step "Test 1: Create lowercase record"
-ndcli --quiet create rr "$LOWER_HOST" A 10.1.1.1 --only-forward
+ndcli --quiet create rr myhost.case-canonical-test.com. A 10.1.1.1 --only-forward
 
 step "Test 2: Case Normalization - Creating uppercase record is detected as duplicate"
 set +e
-DUP_OUT=$(ndcli create rr "$UPPER_HOST" A 10.1.1.1 --only-forward 2>&1)
+DUP_OUT=$(ndcli create rr MYHOST.case-canonical-test.com. A 10.1.1.1 --only-forward 2>&1)
 DUP_EXIT=$?
 set -e
 
@@ -40,17 +36,17 @@ assert_exit_code "Uppercase duplicate creation exit code" 0 "$DUP_EXIT" "$DUP_OU
 assert_contains "Duplicate detection message" "already exists" "$DUP_OUT"
 
 # Verify only 1 record exists in database
-RECORD_COUNT=$(ndcli list rrs "*.${ZONE}." A -H | grep -c "myhost" || true)
+RECORD_COUNT=$(ndcli list rrs "*.case-canonical-test.com." A -H | grep -c "myhost" || true)
 assert_equals "Total records in zone after case-insensitive duplicate attempt" "1" "$RECORD_COUNT" "Count"
 
 step "Test 3: Case-insensitive query matching"
-QUERY_OUT=$(ndcli list rrs "$MIXED_HOST" A -H | awk '{print $5}')
+QUERY_OUT=$(ndcli list rrs MyHost.case-canonical-test.com. A -H | awk '{print $5}')
 assert_equals "Mixed-case query resolves to canonical record IP" "10.1.1.1" "$QUERY_OUT" "IP"
 
 step "Wait for PowerDNS to receive signed record"
 SYNCED=false
 for _ in $(seq 1 20); do
-    PDNS_ANS=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "$MIXED_HOST" A +short || true)
+    PDNS_ANS=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" MyHost.case-canonical-test.com. A +short || true)
     if [ "$PDNS_ANS" = "10.1.1.1" ]; then
         SYNCED=true
         break
@@ -61,7 +57,7 @@ done
 assert_equals "PowerDNS answers case-insensitive query" "true" "$SYNCED"
 
 step "Test 4: Verify RFC 4034 Canonical DNSSEC signing"
-if ! python3 "${SCRIPT_DIR}/../verify-dnssec-zone.py" "$ZONE" "@${PDNS_ADDRESS:-127.1.1.1}"; then
+if ! python3 "${SCRIPT_DIR}/../verify-dnssec-zone.py" case-canonical-test.com "@${PDNS_ADDRESS:-127.1.1.1}"; then
     log_fail "DNSSEC cryptographic verification failed on canonicalized zone!"
 fi
 log_pass "Zone signatures verified cryptographically with canonical lowercase names."

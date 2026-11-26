@@ -19,10 +19,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../test-lib.sh"
 setup_env
 
-ZONE="cname-loop-eval.com"
 
 cleanup_loop() {
-    delete_zone_all_views "$ZONE"
+    delete_zone_all_views cname-loop-eval.com
 }
 trap cleanup_loop EXIT INT TERM
 
@@ -30,16 +29,16 @@ step "Clean up previous runs"
 cleanup_loop
 
 step "Create zone and enable output synchronization"
-ndcli --quiet create zone "$ZONE"
-ensure_output_sync "$ZONE"
+ndcli --quiet create zone cname-loop-eval.com
+ensure_output_sync cname-loop-eval.com
 
 step "Test 1: Create initial CNAME pointing from a to b"
-ndcli --quiet create rr "a.${ZONE}." CNAME "b.${ZONE}."
+ndcli --quiet create rr "a.cname-loop-eval.com." CNAME "b.cname-loop-eval.com."
 log_pass "Initial CNAME a -> b created."
 
 step "Test 2: Prove whether DIM blocks or allows direct circular CNAME (b -> a)"
 set +e
-LOOP_OUT=$(ndcli create rr "b.${ZONE}." CNAME "a.${ZONE}." 2>&1)
+LOOP_OUT=$(ndcli create rr "b.cname-loop-eval.com." CNAME "a.cname-loop-eval.com." 2>&1)
 LOOP_EXIT=$?
 set -e
 
@@ -54,8 +53,8 @@ else
     step "Wait for PowerDNS to receive circular CNAME records"
     SYNCED=false
     for _ in $(seq 1 20); do
-        PDNS_ANS=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "a.${ZONE}." CNAME +short)
-        if [ "$PDNS_ANS" = "b.${ZONE}." ]; then
+        PDNS_ANS=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "a.cname-loop-eval.com." CNAME +short)
+        if [ "$PDNS_ANS" = "b.cname-loop-eval.com." ]; then
             SYNCED=true
             break
         fi
@@ -64,7 +63,7 @@ else
     assert_equals "PowerDNS received CNAME records" "true" "$SYNCED"
 
     step "Test 3: Querying resolution of circular CNAME in PowerDNS results in SERVFAIL"
-    QUERY_STATUS=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "a.${ZONE}." A | grep "status:" | awk '{print $6}' | tr -d ',')
+    QUERY_STATUS=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "a.cname-loop-eval.com." A | grep "status:" | awk '{print $6}' | tr -d ',')
     echo "  PowerDNS response status for circular CNAME: $QUERY_STATUS"
 
     assert_equals "PowerDNS returns SERVFAIL on circular CNAME loop" "SERVFAIL" "$QUERY_STATUS" "DNS Status"

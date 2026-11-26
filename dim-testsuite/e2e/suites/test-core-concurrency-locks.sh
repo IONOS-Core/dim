@@ -10,31 +10,26 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../test-lib.sh"
 setup_env
 
-POOL="concur-pool"
-CONTAINER="192.168.0.0/16"
-SUBNET="192.168.235.0/28"
-ZONE="concur-test.com"
-REV_ZONE="235.168.192.in-addr.arpa"
 CONCURRENT_WORKERS=10
 
 cleanup_concur() {
-    delete_zone_all_views "$ZONE"
-    delete_zone_all_views "$REV_ZONE"
-    ndcli -q modify pool "$POOL" remove subnet "$SUBNET" 2>/dev/null || true
-    ndcli -q delete pool "$POOL" 2>/dev/null || true
-    ndcli -q delete container "$CONTAINER" 2>/dev/null || true
+    delete_zone_all_views "concur-test.com"
+    delete_zone_all_views "235.168.192.in-addr.arpa"
+    ndcli -q modify pool concur-pool remove subnet 192.168.235.0/28 2>/dev/null || true
+    ndcli -q delete pool concur-pool 2>/dev/null || true
+    ndcli -q delete container 192.168.0.0/16 2>/dev/null || true
 }
 
 step "Clean up previous runs"
 cleanup_concur
 
-step "Create IPAM Container, Pool, and /28 Subnet ($SUBNET)"
-ndcli -q create container "$CONTAINER"
-ndcli -q create pool "$POOL"
-ndcli -q modify pool "$POOL" add subnet "$SUBNET"
-ndcli -q create zone "$ZONE"
-ensure_output_sync "$ZONE"
-ensure_output_sync "$REV_ZONE"
+step "Create IPAM Container, Pool, and /28 Subnet (192.168.235.0/28)"
+ndcli -q create container 192.168.0.0/16
+ndcli -q create pool concur-pool
+ndcli -q modify pool concur-pool add subnet 192.168.235.0/28
+ndcli -q create zone concur-test.com
+ensure_output_sync "concur-test.com"
+ensure_output_sync "235.168.192.in-addr.arpa"
 
 step "Test 1: Launch $CONCURRENT_WORKERS parallel worker processes allocating from the same pool"
 PIDS=()
@@ -42,7 +37,7 @@ ERRORS=0
 
 for i in $(seq 1 "$CONCURRENT_WORKERS"); do
     (
-        ndcli -q create rr "worker${i}.${ZONE}." from "$POOL"
+        ndcli -u admin -p admin -q create rr "worker${i}.concur-test.com." from concur-pool
     ) &
     PIDS+=("$!")
 done
@@ -58,20 +53,20 @@ assert_equals "All concurrent allocations succeeded without lock failure" "0" "$
 
 step "Test 2: Assert zero IP collisions among concurrent allocations"
 # shellcheck disable=SC2126 # grep|wc -l prevents set -e termination on 0 matches
-TOTAL_A_RECORDS=$(ndcli list rrs "*.${ZONE}." A -H | grep "worker" | wc -l)
+TOTAL_A_RECORDS=$(ndcli list rrs "*.concur-test.com." A -H | grep "worker" | wc -l)
 assert_equals "Total concurrent A records created" "$CONCURRENT_WORKERS" "$TOTAL_A_RECORDS" "Count"
 
-UNIQUE_IPS=$(ndcli list rrs "*.${ZONE}." A -H | awk '{print $5}' | sort -u | wc -l)
+UNIQUE_IPS=$(ndcli list rrs "*.concur-test.com." A -H | awk '{print $5}' | sort -u | wc -l)
 assert_equals "All concurrently allocated IPs are strictly unique" "$CONCURRENT_WORKERS" "$UNIQUE_IPS" "Count"
 
 # shellcheck disable=SC2126
-TOTAL_PTR_RECORDS=$(ndcli list rrs "*.${REV_ZONE}." PTR -H | grep "${ZONE}." | wc -l)
+TOTAL_PTR_RECORDS=$(ndcli list rrs "*.235.168.192.in-addr.arpa." PTR -H | grep "concur-test.com." | wc -l)
 assert_equals "Total concurrent PTR records created" "$CONCURRENT_WORKERS" "$TOTAL_PTR_RECORDS" "Count"
 
 step "Wait for PowerDNS to receive all concurrent records"
 SYNCED=false
 for _ in $(seq 1 20); do
-    PDNS_COUNT=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "worker${CONCURRENT_WORKERS}.${ZONE}." A +short)
+    PDNS_COUNT=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "worker${CONCURRENT_WORKERS}.concur-test.com." A +short)
     if [ -n "$PDNS_COUNT" ]; then
         SYNCED=true
         break

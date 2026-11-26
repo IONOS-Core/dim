@@ -25,25 +25,24 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../test-lib.sh"
 setup_env
 
-ZONE="lame-apex-eval.com"
 
 cleanup_lame_apex() {
-    delete_zone_all_views "$ZONE"
+    delete_zone_all_views lame-apex-eval.com
 }
 trap cleanup_lame_apex EXIT INT TERM
 
 step "Clean up previous runs"
 cleanup_lame_apex
 
-step "Create zone without profile in DIM: ${ZONE}"
-CREATE_OUT=$(ndcli create zone "$ZONE" 2>&1)
+step "Create zone without profile in DIM: lame-apex-eval.com"
+CREATE_OUT=$(ndcli create zone lame-apex-eval.com 2>&1)
 echo "$CREATE_OUT"
-ensure_output_sync "$ZONE"
+ensure_output_sync lame-apex-eval.com
 
 step "Wait for PowerDNS to receive authoritative zone"
 SYNCED=false
 for _ in $(seq 1 20); do
-    SOA_ANS=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "${ZONE}." SOA +short)
+    SOA_ANS=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "lame-apex-eval.com." SOA +short)
     if [ -n "$SOA_ANS" ]; then
         SYNCED=true
         break
@@ -54,11 +53,11 @@ assert_equals "PowerDNS received zone with SOA" "true" "$SYNCED"
 
 step "Test 1: Check whether DIM populated an apex NS record"
 # shellcheck disable=SC2126 # grep|wc -l prevents set -e termination on 0 matches
-NS_COUNT_DIM=$(ndcli list rrs "${ZONE}." NS -H | grep -v "^INFO" | wc -l)
+NS_COUNT_DIM=$(ndcli list rrs "lame-apex-eval.com." NS -H | grep -v "^INFO" | wc -l)
 echo "  Apex NS records in DIM: $NS_COUNT_DIM"
 
 step "Test 2: Query PowerDNS for apex NS records"
-PDNS_NS_ANS=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "${ZONE}." NS +noall +answer)
+PDNS_NS_ANS=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "lame-apex-eval.com." NS +noall +answer)
 echo "  PowerDNS NS answer section:"
 echo "  $PDNS_NS_ANS"
 
@@ -66,7 +65,7 @@ echo "  $PDNS_NS_ANS"
 # Authoritative zone MUST serve at least one apex NS record
 if [ -z "$PDNS_NS_ANS" ]; then
     # Query authority section to demonstrate NODATA / Lame Delegation response
-    AUTH_SECTION=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "${ZONE}." NS +noall +authority)
+    AUTH_SECTION=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "lame-apex-eval.com." NS +noall +authority)
     echo "  PowerDNS returned NODATA with SOA in authority section:"
     echo "  $AUTH_SECTION"
 

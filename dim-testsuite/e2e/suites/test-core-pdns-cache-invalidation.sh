@@ -28,10 +28,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../test-lib.sh"
 setup_env
 
-ZONE="cache-inval-eval.com"
 
 cleanup_cache_test() {
-    delete_zone_all_views "$ZONE"
+    delete_zone_all_views cache-inval-eval.com
 }
 trap cleanup_cache_test EXIT INT TERM
 
@@ -53,15 +52,15 @@ for conf in /src/dim-testsuite/docker/pdns1.conf /src/dim-testsuite/docker/pdns2
 done
 
 step "Test 2: Verify immediate end-to-end propagation without stale caching"
-ndcli --quiet create zone "$ZONE"
-ensure_output_sync "$ZONE"
+ndcli --quiet create zone cache-inval-eval.com
+ensure_output_sync cache-inval-eval.com
 
-ndcli --quiet create rr "app.${ZONE}." A 192.0.2.1
+ndcli --quiet create rr "app.cache-inval-eval.com." A 192.0.2.1
 
 # Wait for initial record
 SYNCED=false
 for _ in $(seq 1 20); do
-    IP1=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "app.${ZONE}." A +short)
+    IP1=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "app.cache-inval-eval.com." A +short)
     if [ "$IP1" = "192.0.2.1" ]; then
         SYNCED=true
         break
@@ -72,12 +71,12 @@ assert_equals "Initial sync flag set" "true" "$SYNCED"
 assert_equals "Initial record served by PowerDNS" "192.0.2.1" "$IP1"
 
 # Perform immediate update
-ndcli --quiet create rr "app.${ZONE}." A 198.51.100.1 --overwrite-a
+ndcli --quiet create rr "app.cache-inval-eval.com." A 198.51.100.1 --overwrite-a
 
 # Verify immediate visibility in PowerDNS
 UPDATED=false
 for _ in $(seq 1 20); do
-    IP2=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "app.${ZONE}." A +short)
+    IP2=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "app.cache-inval-eval.com." A +short)
     if [ "$IP2" = "198.51.100.1" ]; then
         UPDATED=true
         break

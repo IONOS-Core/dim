@@ -10,28 +10,27 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../test-lib.sh"
 setup_env
 
-ZONE="soa-overwrites-test.com"
 
 cleanup_soa() {
-    delete_zone_all_views "$ZONE"
+    delete_zone_all_views soa-overwrites-test.com
 }
 
 step "Clean up previous runs"
 cleanup_soa
 
 step "Create zone and capture baseline SOA parameters"
-ndcli --quiet create zone "$ZONE"
-ensure_output_sync "$ZONE"
+ndcli --quiet create zone soa-overwrites-test.com
+ensure_output_sync soa-overwrites-test.com
 
-BASELINE_SOA=$(ndcli list zone "$ZONE" -H | grep "SOA")
+BASELINE_SOA=$(ndcli list zone soa-overwrites-test.com -H | grep "SOA")
 INITIAL_SERIAL=$(echo "$BASELINE_SOA" | awk '{print $7}')
 INITIAL_TTL=$(echo "$BASELINE_SOA" | awk '{print $3}')
 echo "  Baseline: Serial=$INITIAL_SERIAL, TTL=$INITIAL_TTL"
 
 step "Test 1: Override SOA timers (refresh 3600, retry 900, ttl 300)"
-ndcli modify zone "$ZONE" set refresh 3600 retry 900 ttl 300
+ndcli modify zone soa-overwrites-test.com set refresh 3600 retry 900 ttl 300
 
-UPDATED_SOA=$(ndcli list zone "$ZONE" -H | grep "SOA")
+UPDATED_SOA=$(ndcli list zone soa-overwrites-test.com -H | grep "SOA")
 UPDATED_SERIAL=$(echo "$UPDATED_SOA" | awk '{print $7}')
 UPDATED_TTL=$(echo "$UPDATED_SOA" | awk '{print $3}')
 echo "  Updated:  Serial=$UPDATED_SERIAL, TTL=$UPDATED_TTL"
@@ -52,7 +51,7 @@ assert_contains "SOA contains updated retry 900" "900" "$UPDATED_SOA"
 
 step "Test 2: Validation Guard - Malformed primary nameserver rejected"
 set +e
-MALFORMED_PRIMARY=$(ndcli modify zone "$ZONE" set primary "bad..nameserver" 2>&1)
+MALFORMED_PRIMARY=$(ndcli modify zone soa-overwrites-test.com set primary "bad..nameserver" 2>&1)
 EXIT_PRIMARY=$?
 set -e
 
@@ -63,7 +62,7 @@ step "Wait for PowerDNS to receive updated SOA parameters"
 SYNCED=false
 PDNS_SOA=""
 for _ in $(seq 1 20); do
-    PDNS_SOA=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "${ZONE}." SOA +short)
+    PDNS_SOA=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "soa-overwrites-test.com." SOA +short)
     if echo "$PDNS_SOA" | grep -q "3600 900"; then
         SYNCED=true
         break
@@ -74,7 +73,7 @@ done
 assert_equals "PowerDNS serves updated SOA timers" "true" "$SYNCED"
 
 # Verify PowerDNS SOA TTL
-PDNS_TTL=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "${ZONE}." SOA +noall +answer | awk '{print $2}')
+PDNS_TTL=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "soa-overwrites-test.com." SOA +noall +answer | awk '{print $2}')
 assert_equals "PowerDNS serves updated SOA TTL" "300" "$PDNS_TTL" "TTL"
 
 step "Cleanup"

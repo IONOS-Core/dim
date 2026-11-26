@@ -10,28 +10,27 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../test-lib.sh"
 setup_env
 
-ZONE="axfr-sync-test.com"
 
 cleanup_axfr() {
-    delete_zone_all_views "$ZONE"
+    delete_zone_all_views axfr-sync-test.com
 }
 
 step "Clean up previous runs"
 cleanup_axfr
 
 step "Create DNSSEC-enabled zone with diverse record types"
-ndcli create zone "$ZONE" -q
-ensure_output_sync "$ZONE"
-ndcli create rr "web.${ZONE}." A 10.0.1.10 -q
-ndcli create rr "web.${ZONE}." AAAA 2001:db8::10 -q
-ndcli create rr "mail.${ZONE}." MX 10 "mailgw.example.org." -q
-ndcli create rr "${ZONE}." TXT "axfr verification payload" -q
-ndcli modify zone "$ZONE" dnssec enable 8 ksk 2048 zsk 1024 -q
+ndcli create zone axfr-sync-test.com -q
+ensure_output_sync axfr-sync-test.com
+ndcli create rr web.axfr-sync-test.com. A 10.0.1.10 -q
+ndcli create rr web.axfr-sync-test.com. AAAA 2001:db8::10 -q
+ndcli create rr mail.axfr-sync-test.com. MX 10 "mailgw.example.org." -q
+ndcli create rr axfr-sync-test.com. TXT "axfr verification payload" -q
+ndcli modify zone axfr-sync-test.com dnssec enable 8 ksk 2048 zsk 1024 -q
 
 step "Wait for PowerDNS to receive signed zone"
 SYNCED=false
 for _ in $(seq 1 20); do
-    if dig "@${PDNS_ADDRESS:-127.1.1.1}" "${ZONE}." SOA +dnssec +noall +answer | grep -q "RRSIG"; then
+    if dig "@${PDNS_ADDRESS:-127.1.1.1}" axfr-sync-test.com. SOA +dnssec +noall +answer | grep -q "RRSIG"; then
         SYNCED=true
         break
     fi
@@ -41,7 +40,7 @@ done
 assert_equals "Zone sync to PowerDNS" "true" "$SYNCED"
 
 step "Test 1: Execute AXFR transfer against PowerDNS"
-AXFR_OUTPUT=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "${ZONE}." AXFR)
+AXFR_OUTPUT=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" axfr-sync-test.com. AXFR)
 echo "  AXFR record count: $(echo "$AXFR_OUTPUT" | grep -v '^;' | grep -c -v '^$')"
 
 # AXFR RFC 5936 rule: First and last records MUST be the zone SOA
@@ -65,10 +64,10 @@ echo "  Initial AXFR SOA serial: $SERIAL_INITIAL"
 assert_not_empty "Initial SOA serial" "$SERIAL_INITIAL"
 
 step "Test 2: Mutate zone and assert SOA serial increment in next AXFR"
-ndcli create rr "api.${ZONE}." A 10.0.1.99 -q
+ndcli create rr api.axfr-sync-test.com. A 10.0.1.99 -q
 
 sleep 2
-AXFR_SECOND=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "${ZONE}." AXFR)
+AXFR_SECOND=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" axfr-sync-test.com. AXFR)
 SERIAL_SECOND=$(echo "$AXFR_SECOND" | grep -v '^;' | awk '$4 == "SOA" {print $7}' | head -n1)
 echo "  Updated AXFR SOA serial: $SERIAL_SECOND"
 

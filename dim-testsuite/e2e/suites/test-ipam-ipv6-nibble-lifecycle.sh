@@ -15,46 +15,42 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../test-lib.sh"
 setup_env
 
-FWD_ZONE="ipv6-test.com"
 # 2001:db8:beef::/48 -> f.e.e.b.8.b.d.0.1.0.0.2.ip6.arpa
-REV_ZONE="f.e.e.b.8.b.d.0.1.0.0.2.ip6.arpa"
-IPV6_ADDR="2001:db8:beef::42"
-HOSTNAME="app1.${FWD_ZONE}"
 
 step "Clean up previous runs"
-delete_zone_all_views "$FWD_ZONE"
-delete_zone_all_views "$REV_ZONE"
+delete_zone_all_views ipv6-test.com
+delete_zone_all_views f.e.e.b.8.b.d.0.1.0.0.2.ip6.arpa
 
-step "Create forward zone: $FWD_ZONE"
-ndcli create zone "$FWD_ZONE"
-ensure_output_sync "$FWD_ZONE"
+step "Create forward zone: ipv6-test.com"
+ndcli create zone ipv6-test.com
+ensure_output_sync ipv6-test.com
 
-step "Create IPv6 reverse zone in nibble format: $REV_ZONE"
-ndcli create zone "$REV_ZONE"
-ensure_output_sync "$REV_ZONE"
+step "Create IPv6 reverse zone in nibble format: f.e.e.b.8.b.d.0.1.0.0.2.ip6.arpa"
+ndcli create zone f.e.e.b.8.b.d.0.1.0.0.2.ip6.arpa
+ensure_output_sync f.e.e.b.8.b.d.0.1.0.0.2.ip6.arpa
 
 step "Create AAAA record with auto-PTR enabled"
-OUTPUT=$(ndcli create rr "$HOSTNAME." aaaa "$IPV6_ADDR" 2>&1)
+OUTPUT=$(ndcli create rr "app1.ipv6-test.com." aaaa 2001:db8:beef::42 2>&1)
 echo "$OUTPUT"
 
-step "Verify PTR record was automatically generated in $REV_ZONE"
-PTR_LIST=$(ndcli list zone "$REV_ZONE" -H)
-echo "  Records in $REV_ZONE:"
+step "Verify PTR record was automatically generated in f.e.e.b.8.b.d.0.1.0.0.2.ip6.arpa"
+PTR_LIST=$(ndcli list zone f.e.e.b.8.b.d.0.1.0.0.2.ip6.arpa -H)
+echo "  Records in f.e.e.b.8.b.d.0.1.0.0.2.ip6.arpa:"
 echo "$PTR_LIST"
 
-if ! echo "$PTR_LIST" | grep -q "$HOSTNAME."; then
-    log_fail "PTR record for $HOSTNAME was not created in $REV_ZONE!"
+if ! echo "$PTR_LIST" | grep -q "app1.ipv6-test.com."; then
+    log_fail "PTR record for app1.ipv6-test.com was not created in f.e.e.b.8.b.d.0.1.0.0.2.ip6.arpa!"
 fi
 log_pass "Auto-PTR successfully created in IPv6 nibble zone."
 
 # Full 32-nibble reverse FQDN (20 nibbles in record + 12 nibbles in /48 zone = 32 nibbles)
-FULL_REV_NAME="2.4.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.${REV_ZONE}."
+FULL_REV_NAME="2.4.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.f.e.e.b.8.b.d.0.1.0.0.2.ip6.arpa."
 
 step "Wait for PowerDNS to receive forward and reverse zones"
 SYNCED=false
 for _ in $(seq 1 20); do
-    if dig "@${PDNS_ADDRESS:-127.1.1.1}" "$HOSTNAME." AAAA +noall +answer | grep -q "$IPV6_ADDR" && \
-       dig "@${PDNS_ADDRESS:-127.1.1.1}" "$FULL_REV_NAME" PTR +short | grep -q "$HOSTNAME"; then
+    if dig "@${PDNS_ADDRESS:-127.1.1.1}" "app1.ipv6-test.com." AAAA +noall +answer | grep -q 2001:db8:beef::42 && \
+       dig "@${PDNS_ADDRESS:-127.1.1.1}" "$FULL_REV_NAME" PTR +short | grep -q app1.ipv6-test.com; then
         SYNCED=true
         break
     fi
@@ -62,20 +58,20 @@ for _ in $(seq 1 20); do
 done
 
 if [ "$SYNCED" = false ]; then
-    log_fail "PowerDNS did not receive forward AAAA and reverse PTR records for $HOSTNAME."
+    log_fail "PowerDNS did not receive forward AAAA and reverse PTR records for app1.ipv6-test.com."
 fi
-log_pass "PowerDNS answers authoritative AAAA and PTR queries for $HOSTNAME."
+log_pass "PowerDNS answers authoritative AAAA and PTR queries for app1.ipv6-test.com."
 
 PDNS_PTR=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "$FULL_REV_NAME" PTR +short)
 echo "  PowerDNS PTR answer: $PDNS_PTR"
 
-if [[ "$PDNS_PTR" != *"$HOSTNAME."* ]]; then
-    log_fail "PowerDNS PTR query failed! Expected $HOSTNAME., got '$PDNS_PTR'"
+if [[ "$PDNS_PTR" != *"app1.ipv6-test.com."* ]]; then
+    log_fail "PowerDNS PTR query failed! Expected app1.ipv6-test.com., got '$PDNS_PTR'"
 fi
-log_pass "PowerDNS successfully resolved 32-nibble IPv6 PTR to $HOSTNAME."
+log_pass "PowerDNS successfully resolved 32-nibble IPv6 PTR to app1.ipv6-test.com."
 
 step "Delete AAAA record and verify automatic PTR cleanup"
-ndcli delete rr "$HOSTNAME." aaaa "$IPV6_ADDR" -q
+ndcli delete rr "app1.ipv6-test.com." aaaa 2001:db8:beef::42 -q
 
 sleep 2
 PDNS_PTR_AFTER=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "$FULL_REV_NAME" PTR +short)
@@ -85,7 +81,7 @@ fi
 log_pass "IPv6 PTR record cleanly purged from PowerDNS."
 
 step "Cleanup"
-delete_zone_all_views "$FWD_ZONE"
-delete_zone_all_views "$REV_ZONE"
+delete_zone_all_views ipv6-test.com
+delete_zone_all_views f.e.e.b.8.b.d.0.1.0.0.2.ip6.arpa
 
 log_pass "Test ipam-ipv6-nibble-lifecycle completed successfully."

@@ -22,18 +22,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../test-lib.sh"
 setup_env
 
-ZONE="drift-eval.com"
-ZG_MULTI="zg-multi-drift"
-OUT2="out2-drift"
 
 cleanup_drift_test() {
-    delete_zone_all_views "$ZONE"
-    ndcli -q modify output out remove zone-group "$ZG_MULTI" 2>/dev/null || true
-    if ndcli show output "$OUT2" >/dev/null 2>&1; then
-        ndcli -q modify output "$OUT2" remove zone-group "$ZG_MULTI" 2>/dev/null || true
-        ndcli -q delete output "$OUT2" 2>/dev/null || true
+    delete_zone_all_views drift-eval.com
+    ndcli -q modify output out remove zone-group zg-multi-drift 2>/dev/null || true
+    if ndcli show output out2-drift >/dev/null 2>&1; then
+        ndcli -q modify output out2-drift remove zone-group zg-multi-drift 2>/dev/null || true
+        ndcli -q delete output out2-drift 2>/dev/null || true
     fi
-    ndcli -q delete zone-group "$ZG_MULTI" 2>/dev/null || true
+    ndcli -q delete zone-group zg-multi-drift 2>/dev/null || true
 }
 trap cleanup_drift_test EXIT INT TERM
 
@@ -41,16 +38,16 @@ step "Clean up previous runs"
 cleanup_drift_test
 
 step "Configure second output (out2 -> pdns2) and dual-output zone-group"
-ndcli --quiet create output "$OUT2" plugin pdns-db db-uri "mysql://pdns:pdns@127.0.0.1:3307/pdns2"
-ndcli --quiet create zone-group "$ZG_MULTI"
+ndcli --quiet create output out2-drift plugin pdns-db db-uri "mysql://pdns:pdns@127.0.0.1:3307/pdns2"
+ndcli --quiet create zone-group zg-multi-drift
 
-ndcli --quiet modify output out add zone-group "$ZG_MULTI"
-ndcli --quiet modify output "$OUT2" add zone-group "$ZG_MULTI"
+ndcli --quiet modify output out add zone-group zg-multi-drift
+ndcli --quiet modify output out2-drift add zone-group zg-multi-drift
 
 step "Create zone and add to dual-output zone-group"
-ndcli --quiet create zone "$ZONE"
-ndcli --quiet modify zone-group "$ZG_MULTI" add zone "$ZONE"
-ndcli --quiet create rr "app.${ZONE}." A 10.0.0.1
+ndcli --quiet create zone drift-eval.com
+ndcli --quiet modify zone-group zg-multi-drift add zone drift-eval.com
+ndcli --quiet create rr "app.drift-eval.com." A 10.0.0.1
 
 step "Test 1: Baseline Synchronization - Verify both pdns1 and pdns2 serve identical records"
 SYNCED_PDNS1=false
@@ -58,11 +55,11 @@ SYNCED_PDNS2=false
 
 for _ in $(seq 1 20); do
     if [ "$SYNCED_PDNS1" != "true" ]; then
-        ANS1=$(dig "@127.1.1.1" "app.${ZONE}." A +short)
+        ANS1=$(dig "@127.1.1.1" "app.drift-eval.com." A +short)
         if [ "$ANS1" = "10.0.0.1" ]; then SYNCED_PDNS1=true; fi
     fi
     if [ "$SYNCED_PDNS2" != "true" ]; then
-        ANS2=$(dig "@127.2.2.2" "app.${ZONE}." A +short)
+        ANS2=$(dig "@127.2.2.2" "app.drift-eval.com." A +short)
         if [ "$ANS2" = "10.0.0.1" ]; then SYNCED_PDNS2=true; fi
     fi
     if [ "$SYNCED_PDNS1" = "true" ] && [ "$SYNCED_PDNS2" = "true" ]; then
@@ -73,11 +70,11 @@ done
 
 assert_equals "pdns1 (@127.1.1.1) synchronized baseline record" "true" "$SYNCED_PDNS1"
 assert_equals "pdns2 (@127.2.2.2) synchronized baseline record" "true" "$SYNCED_PDNS2"
-log_pass "Both nameservers are in sync: app.${ZONE}. -> 10.0.0.1."
+log_pass "Both nameservers are in sync: app.drift-eval.com. -> 10.0.0.1."
 
 step "Test 2: Simulate output drift by blocking out2 while mutating record"
 # Find numeric ID of out2
-OUT2_ID=$(sql_command "SELECT id FROM output WHERE name='${OUT2}';")
+OUT2_ID=$(sql_command "SELECT id FROM output WHERE name='out2-drift';")
 
 # Use persistent Python helper to hold named lock on out2 while applying update
 python3 -c "
@@ -90,18 +87,18 @@ c = db.cursor()
 c.execute(\"SELECT GET_LOCK('output_${OUT2_ID}', 10);\")
 
 # Apply update in DIM (change IP to 10.0.0.2)
-subprocess.run(['ndcli', '--quiet', 'create', 'rr', 'app.${ZONE}.', 'A', '10.0.0.2', '--overwrite-a'], check=True)
+subprocess.run(['ndcli', '--quiet', 'create', 'rr', 'app.drift-eval.com.', 'A', '10.0.0.2', '--overwrite-a'], check=True)
 
 # Allow pdns1 to process the update while out2 is blocked
 time.sleep(2)
 
 # Verify pdns1 updated to 10.0.0.2
-res1 = subprocess.run(['dig', '@127.1.1.1', 'app.${ZONE}.', 'A', '+short'], capture_output=True, text=True)
+res1 = subprocess.run(['dig', '@127.1.1.1', 'app.drift-eval.com.', 'A', '+short'], capture_output=True, text=True)
 ans1 = res1.stdout.strip()
 print(f'  pdns1 (healthy) answer: {ans1}')
 
 # Verify pdns2 is still serving stale 10.0.0.1
-res2 = subprocess.run(['dig', '@127.2.2.2', 'app.${ZONE}.', 'A', '+short'], capture_output=True, text=True)
+res2 = subprocess.run(['dig', '@127.2.2.2', 'app.drift-eval.com.', 'A', '+short'], capture_output=True, text=True)
 ans2 = res2.stdout.strip()
 print(f'  pdns2 (blocked) answer: {ans2}')
 
@@ -118,7 +115,7 @@ db.close()
 step "Test 3: Convergence - Verify out2 catches up after unblocking"
 CONVERGED=false
 for _ in $(seq 1 20); do
-    C_ANS2=$(dig "@127.2.2.2" "app.${ZONE}." A +short)
+    C_ANS2=$(dig "@127.2.2.2" "app.drift-eval.com." A +short)
     if [ "$C_ANS2" = "10.0.0.2" ]; then
         CONVERGED=true
         break

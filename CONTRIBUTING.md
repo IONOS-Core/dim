@@ -54,6 +54,12 @@ DIM uses multi-tiered testing:
 - **Live Stack E2E Tests:** `make test-e2e` (runs live against MariaDB, PowerDNS, Flask, pdns-output)
   - Run specific domain filter: `make test-e2e SUITE=dnssec` (or `SUITE=ipam`, `SUITE=records`)
 
+**Testing Guidelines & Rules:**
+- Tests that verify DIM middleware, CLI, IPAM, zone, or record behavior WITHOUT requiring live authoritative nameserver (`dig`) queries MUST be written as standard `.t` scenario tests in `dim-testsuite/t/`.
+- Before writing any new tests, contributors MUST inspect existing `.t` tests in `dim-testsuite/t/` and Python tests in `dim-testsuite/tests/` to avoid creating duplicate test cases.
+- Live stack E2E suites (`dim-testsuite/e2e/suites/`) are reserved strictly for multi-daemon interaction requiring DNSSEC signing, PowerDNS publication, and `dig` verification against nameservers.
+- In all tests (both `.t` and E2E scripts): **DO NOT use variable indirections** (e.g., `BLAFASEL=10.2.215.0/24; ndcli modify pool p add subnet $BLAFASEL`). Always write explicit literal values directly into commands so tests are readable, debuggable, and copy-pasteable.
+
 ### 3. Local Testbed
 Start and explore the isolated local Docker testbed:
 ```sh

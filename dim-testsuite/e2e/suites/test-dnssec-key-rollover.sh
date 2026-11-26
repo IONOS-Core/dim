@@ -14,34 +14,33 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../test-lib.sh"
 setup_env
 
-ZONE="rollover-zone.com"
 
 step "Clean up previous runs"
-delete_zone_all_views "$ZONE"
+delete_zone_all_views rollover-zone.com
 
-step "Create DNSSEC-signed zone: $ZONE"
-ndcli create zone "$ZONE"
-ensure_output_sync "$ZONE"
-ndcli modify zone "$ZONE" dnssec enable 8 ksk 2048 zsk 1024
-ndcli create rr "service.${ZONE}." A 10.55.1.1 -q
+step "Create DNSSEC-signed zone: rollover-zone.com"
+ndcli create zone rollover-zone.com
+ensure_output_sync rollover-zone.com
+ndcli modify zone rollover-zone.com dnssec enable 8 ksk 2048 zsk 1024
+ndcli create rr "service.rollover-zone.com." A 10.55.1.1 -q
 
 step "Wait for initial signing in PowerDNS"
 for _ in $(seq 1 20); do
-    if dig "@${PDNS_ADDRESS:-127.1.1.1}" "${ZONE}." SOA +dnssec +noall +answer | grep -q "RRSIG"; then
+    if dig "@${PDNS_ADDRESS:-127.1.1.1}" "rollover-zone.com." SOA +dnssec +noall +answer | grep -q "RRSIG"; then
         break
     fi
     sleep 1
 done
 
-INITIAL_KEYS=$(ndcli list zone "$ZONE" keys -H | wc -l)
+INITIAL_KEYS=$(ndcli list zone rollover-zone.com keys -H | wc -l)
 echo "  Initial keys in DIM: $INITIAL_KEYS (1 KSK, 1 ZSK)"
-OLD_ZSK=$(ndcli list zone "$ZONE" keys -H | awk '$2 == "ZSK" {print $1}' | head -n1)
+OLD_ZSK=$(ndcli list zone rollover-zone.com keys -H | awk '$2 == "ZSK" {print $1}' | head -n1)
 echo "  Active initial ZSK: $OLD_ZSK"
 
 step "Trigger ZSK Rollover: Generate new ZSK"
-ndcli modify zone "$ZONE" dnssec new zsk
+ndcli modify zone rollover-zone.com dnssec new zsk
 
-KEYS_DURING_ROLLOVER=$(ndcli list zone "$ZONE" keys -H | wc -l)
+KEYS_DURING_ROLLOVER=$(ndcli list zone rollover-zone.com keys -H | wc -l)
 echo "  Keys during rollover: $KEYS_DURING_ROLLOVER (expected 3: 1 KSK, 2 ZSKs)"
 
 if [ "$KEYS_DURING_ROLLOVER" -ne 3 ]; then
@@ -52,7 +51,7 @@ log_pass "Dual-ZSK state successfully created in DIM."
 step "Wait for PowerDNS to publish both DNSKEYs"
 SYNCED_KEYS=false
 for _ in $(seq 1 20); do
-    KEY_COUNT_PDNS=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "${ZONE}." DNSKEY +short | wc -l)
+    KEY_COUNT_PDNS=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "rollover-zone.com." DNSKEY +short | wc -l)
     if [ "$KEY_COUNT_PDNS" -ge 3 ]; then
         SYNCED_KEYS=true
         break
@@ -66,15 +65,15 @@ fi
 log_pass "PowerDNS successfully published both ZSKs alongside KSK."
 
 step "Verify Cryptographic & Inception Integrity during Rollover"
-if ! python3 "${SCRIPT_DIR}/../verify-dnssec-zone.py" "$ZONE" "@${PDNS_ADDRESS:-127.1.1.1}"; then
+if ! python3 "${SCRIPT_DIR}/../verify-dnssec-zone.py" rollover-zone.com "@${PDNS_ADDRESS:-127.1.1.1}"; then
     log_fail "Cryptographic verification failed during ZSK rollover!"
 fi
 log_pass "Signatures remain cryptographically valid during rollover."
 
 step "Retire and delete old ZSK: $OLD_ZSK"
-ndcli modify zone "$ZONE" dnssec delete key "$OLD_ZSK"
+ndcli modify zone rollover-zone.com dnssec delete key "$OLD_ZSK"
 
-KEYS_POST_RETIRE=$(ndcli list zone "$ZONE" keys -H | wc -l)
+KEYS_POST_RETIRE=$(ndcli list zone rollover-zone.com keys -H | wc -l)
 echo "  Keys after retiring old ZSK: $KEYS_POST_RETIRE (expected 2)"
 
 if [ "$KEYS_POST_RETIRE" -ne 2 ]; then
@@ -85,7 +84,7 @@ log_pass "Old ZSK retired cleanly from DIM."
 step "Wait for PowerDNS to converge to 2 DNSKEYs"
 SYNCED_POST=false
 for _ in $(seq 1 20); do
-    KEY_COUNT_POST=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "${ZONE}." DNSKEY +short | wc -l)
+    KEY_COUNT_POST=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "rollover-zone.com." DNSKEY +short | wc -l)
     if [ "$KEY_COUNT_POST" -eq 2 ]; then
         SYNCED_POST=true
         break
@@ -99,12 +98,12 @@ fi
 log_pass "PowerDNS converged to post-rollover key set."
 
 step "Verify final Cryptographic integrity"
-if ! python3 "${SCRIPT_DIR}/../verify-dnssec-zone.py" "$ZONE" "@${PDNS_ADDRESS:-127.1.1.1}"; then
+if ! python3 "${SCRIPT_DIR}/../verify-dnssec-zone.py" rollover-zone.com "@${PDNS_ADDRESS:-127.1.1.1}"; then
     log_fail "Cryptographic verification failed after ZSK rollover completed!"
 fi
 log_pass "Final DNSSEC operational status verified."
 
 step "Cleanup"
-delete_zone_all_views "$ZONE"
+delete_zone_all_views rollover-zone.com
 
 log_pass "Test dnssec-key-rollover completed successfully."

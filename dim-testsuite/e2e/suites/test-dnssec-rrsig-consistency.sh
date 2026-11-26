@@ -10,28 +10,27 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../test-lib.sh"
 setup_env
 
-ZONE="rrsig-sync-eval.com"
 
 cleanup_sync() {
-    delete_zone_all_views "$ZONE"
+    delete_zone_all_views rrsig-sync-eval.com
 }
 
 step "Clean up previous runs"
 cleanup_sync
 
 step "Create DNSSEC zone with diverse record types (SOA, DNSKEY, A, MX, TXT, NSEC)"
-ndcli --quiet create zone "$ZONE"
-ensure_output_sync "$ZONE"
-ndcli --quiet modify zone "$ZONE" dnssec enable 8 ksk 2048 zsk 1024
-ndcli --quiet create rr "web.${ZONE}." A 10.10.1.1
-ndcli --quiet create rr "mail.${ZONE}." MX 10 "mailhost.${ZONE}."
-ndcli --quiet create rr "${ZONE}." TXT "timestamp-consistency-probe"
+ndcli --quiet create zone rrsig-sync-eval.com
+ensure_output_sync rrsig-sync-eval.com
+ndcli --quiet modify zone rrsig-sync-eval.com dnssec enable 8 ksk 2048 zsk 1024
+ndcli --quiet create rr "web.rrsig-sync-eval.com." A 10.10.1.1
+ndcli --quiet create rr "mail.rrsig-sync-eval.com." MX 10 "mailhost.rrsig-sync-eval.com."
+ndcli --quiet create rr "rrsig-sync-eval.com." TXT "timestamp-consistency-probe"
 
 step "Wait for PowerDNS to receive all signed records"
 SYNCED=false
 PDNS_ANS=""
 for _ in $(seq 1 20); do
-    PDNS_ANS=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "web.${ZONE}." A +short)
+    PDNS_ANS=$(dig "@${PDNS_ADDRESS:-127.1.1.1}" "web.rrsig-sync-eval.com." A +short)
     if [ "$PDNS_ANS" = "10.10.1.1" ]; then
         SYNCED=true
         break
@@ -42,7 +41,7 @@ done
 assert_equals "PowerDNS received signed records" "true" "$SYNCED"
 
 # Get domain_id from PowerDNS database
-DOMAIN_ID=$(pdns_sql "SELECT id FROM domains WHERE name='${ZONE}';")
+DOMAIN_ID=$(pdns_sql "SELECT id FROM domains WHERE name='rrsig-sync-eval.com';")
 assert_not_empty "PowerDNS domain entry" "$DOMAIN_ID" "Domain ID"
 
 step "Test 1: Assert zero intra-zone inception jitter across all RRSIG records"
@@ -85,8 +84,8 @@ SOA_INC=$(pdns_sql "
 assert_equals "DNSKEY inception matches SOA inception" "$SOA_INC" "$DNSKEY_INC" "Timestamp"
 
 step "Test 4: Verify Cryptographic and Inception Plausibility via verify-dnssec-zone.py"
-if ! python3 "${SCRIPT_DIR}/../verify-dnssec-zone.py" "$ZONE" "@${PDNS_ADDRESS:-127.1.1.1}"; then
-    log_fail "Cryptographic verification failed for $ZONE!"
+if ! python3 "${SCRIPT_DIR}/../verify-dnssec-zone.py" rrsig-sync-eval.com "@${PDNS_ADDRESS:-127.1.1.1}"; then
+    log_fail "Cryptographic verification failed for rrsig-sync-eval.com!"
 fi
 log_pass "Zone signatures verified cryptographically with valid non-future inceptions."
 
