@@ -25,9 +25,11 @@ done
 # Ensure colored aliases are active in all interactive and non-interactive bash shells
 for rc in /etc/bash.bashrc /root/.bashrc; do
     if ! grep -q "alias ll=" "$rc" 2>/dev/null; then
-        echo 'alias ls="ls --color=auto"' >> "$rc"
-        echo 'alias ll="ls -lh --color=auto"' >> "$rc"
-        echo 'alias la="ls -lha --color=auto"' >> "$rc"
+        {
+            echo 'alias ls="ls --color=auto"'
+            echo 'alias ll="ls -lh --color=auto"'
+            echo 'alias la="ls -lha --color=auto"'
+        } >> "$rc"
     fi
 done
 
@@ -65,30 +67,13 @@ run_pytest() {
     fi
 }
 
-run_e2e_scenarios() {
-    echo "### running e2e test scenarios from e2e/"
-    local rc=0
-    for scenario in /src/dim-testsuite/e2e/*.sh; do
-        if [ -x "$scenario" ]; then
-            echo "===> Running E2E scenario: $(basename "$scenario")"
-            "$scenario" || rc=1
-        fi
-    done
-    return $rc
-}
-
 run_ndcli() {
     echo "### running the ndcli suite"
     # TESTS empty means all tests in t/
     # runtest.py reads ndcli's stdout and stderr from one pipe and the expected
     # outputs in t/ rely on stdout being block buffered (flushed at exit, after
     # the log messages on stderr)
-    local rc=0
-    env -u PYTHONUNBUFFERED make test TESTS="${TESTS:-}" || rc=1
-    if [ -z "${TESTS:-}" ]; then
-        run_e2e_scenarios || rc=1
-    fi
-    return $rc
+    env -u PYTHONUNBUFFERED make test TESTS="${TESTS:-}"
 }
 
 # everything dnssec: the unit and rpc tests, the zone signing done by
@@ -172,7 +157,7 @@ case "${1:-all}" in
     output)
         wait_for "DIM Middleware API" "echo > /dev/tcp/localhost/5000"
         JAR="/opt/dim/pdns-output.jar"
-        LOCAL_JAR=$(ls /src/pdns-output/pdns-output/build/libs/*-all.jar 2>/dev/null | tail -1 || true)
+        LOCAL_JAR=$(find /src/pdns-output/pdns-output/build/libs/ -name "*-all.jar" 2>/dev/null | tail -1 || true)
         if [ -n "$LOCAL_JAR" ] && [ -f "$LOCAL_JAR" ]; then
             echo "### [Live-Reload] Using freshly built jar from mount: $LOCAL_JAR"
             JAR="$LOCAL_JAR"

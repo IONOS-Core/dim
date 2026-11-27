@@ -1,4 +1,4 @@
-.PHONY: help check lint test-dim test-pdns-output test-ndcli test-e2e test-all docs docs-serve testbed-start testbed-build testbed-stop testbed-status testbed-seed testbed-shell testbed-logs shell-output shell-pdns restart-mw restart-output clean
+.PHONY: help check lint install-dev test-dim test-pdns-output test-ndcli test-e2e test-scenarios test-all docs docs-serve testbed-start testbed-build testbed-stop testbed-status testbed-seed testbed-import-db testbed-shell testbed-logs shell-output shell-pdns restart-mw restart-output clean
 .DEFAULT_GOAL := help
 
 COMPOSE ?= docker compose -f dim-testsuite/compose.yaml
@@ -9,16 +9,25 @@ help:  ## Show this help message
 		/^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } \
 		/^[a-zA-Z0-9_-]+:.*?## / { printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
+##@ Development Setup
+
+install-dev:  ## Install Python dev dependencies and configure git hooks
+	@echo "==> Installing development dependencies..."
+	@$(PYTHON) -m pip install -r requirements-dev.txt
+	@echo "==> Configuring Git hooks..."
+	@git config core.hooksPath .githooks
+	@chmod +x .githooks/pre-commit scripts/lint-diff.sh
+	@if ! command -v shellcheck >/dev/null 2>&1; then \
+		echo "[WARN] shellcheck is not installed on the system (e.g. 'sudo apt install shellcheck')."; \
+	fi
+	@echo "[OK] Development environment and git hooks configured successfully!"
+
 ##@ Code Quality & Verification
 
 check: lint test-dim test-ndcli  ## Run syntax validation and fast unit test suites
 
-lint:  ## Check Python and shell script syntax
-	@echo "==> Checking Python syntax..."
-	@$(PYTHON) -m py_compile dim/dim/models/*.py dim/dim/*.py ndcli/dimcli/*.py
-	@echo "==> Checking shell script syntax..."
-	@bash -n dim-testsuite/docker/*.sh dim-testsuite/e2e/*.sh
-	@echo "[OK] Syntax checks passed!"
+lint:  ## Run diff-based linting on modified files (Python darker/ruff, Shell shellcheck, Java)
+	@./scripts/lint-diff.sh
 
 test-dim:  ## Run DIM middleware pytest suite in container (optional: PYTESTS="expression")
 	@echo "==> Running DIM middleware pytest suite inside container..."
@@ -26,10 +35,8 @@ test-dim:  ## Run DIM middleware pytest suite in container (optional: PYTESTS="e
 
 test-pdns-output:  ## Run pdns-output Java test suite (requires active testbed)
 	@if ! docker ps --filter "name=dim-testsuite-mariadb" --format '{{.Names}}' | grep -q 'mariadb'; then \
-		echo "[ERROR] The testbed is not running!"; \
-		echo "        pdns-output tests require an active PowerDNS test database."; \
-		echo "        Please run 'make testbed-start' first before running 'make test-pdns-output'."; \
-		exit 1; \
+		echo "==> Testbed is not running. Automatically starting local DIM testbed in background..."; \
+		$(MAKE) testbed-start; \
 	fi
 	@echo "==> Running pdns-output tests..."
 	@cd pdns-output && ./gradlew test
@@ -38,18 +45,34 @@ test-ndcli:  ## Run ndcli CLI unit tests
 	@echo "==> Running ndcli CLI unit tests..."
 	@PYTHONPATH="dimclient:ndcli:$${PYTHONPATH:-}" $(PYTHON) -m pytest ndcli/tests/cliparse_test.py
 
-test-e2e:  ## Run E2E CLI scenario tests (t/*.t) in container (optional: TESTS="name.t")
+test-e2e:  ## Run E2E test suites in active testbed (optional: SUITE="dnssec|zone|records|ipam")
+	@if ! docker ps --filter "name=dim-testsuite-mariadb" --format '{{.Names}}' | grep -q 'mariadb'; then \
+		echo "==> Testbed is not running. Automatically starting local DIM testbed in background..."; \
+		$(MAKE) testbed-start; \
+	fi
+	@echo "==> Running E2E test suites inside testbed..."
+	@$(COMPOSE) exec -T dim-mw /src/dim-testsuite/e2e/run-all.sh $(SUITE)
+
+test-scenarios:  ## Run scenario tests (dim-testsuite/t/*.t) in clean container (optional: TESTS="name.t")
 	@if docker ps --filter "name=dim-testsuite" --format '{{.Names}}' | grep -q 'dim-testsuite'; then \
-		echo "[ERROR] An active DIM testbed is currently running!"; \
-		echo "        E2E scenario tests require a clean, virgin environment to prevent port collisions (port 5000)"; \
-		echo "        and database lock contention ('pdns_poller')."; \
-		echo "        Please run 'make testbed-stop' first before executing 'make test-e2e'."; \
+		echo ""; \
+		echo "========================================================================"; \
+		echo " [COLLISION WARNING] Active DIM testbed is currently running!"; \
+		echo "========================================================================"; \
+		echo " Scenario tests (t/*.t) start their own isolated Flask & DB instances"; \
+		echo " and cannot run simultaneously with an active testbed (port/DB collision)."; \
+		echo ""; \
+		echo " Please stop the active testbed before running scenario tests:"; \
+		echo "    make testbed-stop"; \
+		echo "    make test-scenarios"; \
+		echo "========================================================================"; \
+		echo ""; \
 		exit 1; \
 	fi
-	@echo "==> Running E2E scenario test suite inside container..."
+	@echo "==> Running scenario test suite (t/*.t) inside clean container..."
 	@$(COMPOSE) run --rm -e TESTS="$(TESTS)" testsuite ndcli
 
-test-all: test-dim test-pdns-output test-ndcli test-e2e  ## Run all test suites across all components
+test-all: test-dim test-pdns-output test-ndcli test-scenarios test-e2e  ## Run all test suites across all components
 
 ##@ Documentation
 
@@ -95,9 +118,16 @@ testbed-seed:  ## Populate testbed with demo zone (test.example.com) and sample 
 	@echo "==> Seeding testbed data..."
 	@$(COMPOSE) exec dim-mw /src/dim-testsuite/docker/seed.sh
 
+testbed-import-db:  ## Import database SQL dump(s) into testbed (DIR=... or DIM_DUMP=... PDNS1_DUMP=...)
+	@./dim-testsuite/docker/import-db.sh $(if $(DIR),--dir "$(DIR)") $(if $(DIM_DUMP),--dim "$(DIM_DUMP)") $(if $(PDNS1_DUMP),--pdns1 "$(PDNS1_DUMP)") $(if $(PDNS2_DUMP),--pdns2 "$(PDNS2_DUMP)")
+
 ##@ Container Shells
 
-testbed-shell:  ## Open interactive testbed shell (ndcli with tab-completion, dig)
+testbed-shell:  ## Open interactive testbed shell (pre-authenticated ndcli, tab-completion, dig)
+	@if ! docker ps --filter "name=dim-testsuite-mariadb" --format '{{.Names}}' | grep -q 'mariadb'; then \
+		echo "==> Testbed is not running. Automatically starting local DIM testbed in background..."; \
+		$(MAKE) testbed-start; \
+	fi
 	@$(COMPOSE) exec dim-mw /src/dim-testsuite/docker/testbed-shell.sh
 
 shell-output:  ## Open output daemon shell (pdns-output daemon)

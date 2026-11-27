@@ -1,0 +1,36 @@
+name: Diff Linting
+
+on:
+  pull_request:
+    branches: [master, main]
+  push:
+    branches: ['feature/**', 'fix/**']
+
+jobs:
+  lint-diff:
+    name: Diff Lint (Shell, Python, Java)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code (full history for diff)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies (shellcheck)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y shellcheck
+
+      - name: Install Python lint tools
+        run: |
+          python3 -m pip install -r requirements-dev.txt
+
+      - name: Run diff-based linting against target branch
+        run: |
+          git fetch origin master:origin/master || true
+          ./scripts/lint-diff.sh --branch origin/master
